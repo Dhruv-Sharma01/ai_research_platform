@@ -71,9 +71,7 @@ class OrgMembership(Base):
         DateTime(timezone=True), server_default=text("now()")
     )
 
-    organization: Mapped[Organization] = relationship(
-        back_populates="memberships"
-    )
+    organization: Mapped[Organization] = relationship(back_populates="memberships")
     user: Mapped[User] = relationship(back_populates="org_memberships")
 
     __table_args__ = (
@@ -83,4 +81,46 @@ class OrgMembership(Base):
         ),
         UniqueConstraint("org_id", "user_id", name="uq_org_memberships_org_user"),
         Index("ix_org_memberships_user", "user_id"),
+    )
+
+
+class OrganizationInvite(Base):
+    """Pending invitation to join an organization."""
+
+    __tablename__ = "organization_invites"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    org_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE")
+    )
+    email: Mapped[str] = mapped_column(String(255))
+    role: Mapped[str] = mapped_column(String(20), default="viewer")
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending, accepted, rejected, revoked
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    
+    # Optional: track who created it
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+
+    organization: Mapped[Organization] = relationship()
+    
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('admin', 'editor', 'viewer')",
+            name="ck_org_invites_role_valid",
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'accepted', 'rejected', 'revoked')",
+            name="ck_org_invites_status_valid",
+        ),
+        Index("ix_org_invites_email_status", "email", "status"),
     )

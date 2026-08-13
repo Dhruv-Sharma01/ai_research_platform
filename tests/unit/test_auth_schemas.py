@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC
+
 import pytest
 from pydantic import ValidationError
 
@@ -82,14 +84,14 @@ class TestUserResponse:
     def test_from_attributes(self) -> None:
         """Verify model_config allows ORM model conversion."""
         import uuid
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         # Simulate an ORM object with attributes
         class FakeUser:
             id = uuid.uuid4()
             email = "test@example.com"
             is_active = True
-            created_at = datetime.now(timezone.utc)
+            created_at = datetime.now(UTC)
 
         resp = UserResponse.model_validate(FakeUser())
         assert resp.email == "test@example.com"

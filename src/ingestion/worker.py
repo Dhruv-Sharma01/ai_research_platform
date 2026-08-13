@@ -62,9 +62,7 @@ async def process_single_job(
             # Transition to 'running'
             ok = await job_service.mark_running(_job_id, version, session)
             if not ok:
-                logger.warning(
-                    "optimistic_lock_failed", job_id=str(_job_id)
-                )
+                logger.warning("optimistic_lock_failed", job_id=str(_job_id))
                 await session.rollback()
                 return
 
@@ -73,9 +71,7 @@ async def process_single_job(
 
             doc = await session.get(Document, _doc_id)
             if doc is None or doc.storage_key is None:
-                raise ValueError(
-                    f"Document {_doc_id} not found or has no storage key."
-                )
+                raise ValueError(f"Document {_doc_id} not found or has no storage key.")
 
             # Download from MinIO
             file_data = await storage.download(doc.storage_key)
@@ -151,9 +147,7 @@ async def run_worker(settings: Settings | None = None) -> None:
     shutdown_event = asyncio.Event()
 
     def _handle_signal(sig: int, frame: object) -> None:
-        logger.info(
-            "shutdown_requested", worker_id=worker_id, signal=sig
-        )
+        logger.info("shutdown_requested", worker_id=worker_id, signal=sig)
         shutdown_event.set()
 
     signal.signal(signal.SIGINT, _handle_signal)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
@@ -63,11 +63,9 @@ class Document(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=text("now()"),
-        onupdate=datetime.utcnow,
+        onupdate=lambda: datetime.now(UTC),
     )
-    deleted_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # ── Relationships (strings to avoid circular imports) ────
     user: Mapped[User] = relationship(back_populates="documents")
@@ -87,7 +85,9 @@ class Document(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint("tenant_id", "content_hash", name="uq_documents_tenant_content"),
+        UniqueConstraint(
+            "tenant_id", "content_hash", name="uq_documents_tenant_content"
+        ),
         CheckConstraint(
             "status IN ('pending', 'processing', 'ready', 'failed')",
             name="ck_documents_status_valid",

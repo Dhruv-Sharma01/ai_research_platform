@@ -32,6 +32,10 @@ from tenacity import (
 
 from src.core.exceptions import ExternalServiceError
 from src.core.logging import get_logger
+from src.observability.metrics import (
+    llm_circuit_breaker_state,
+    llm_requests_total,
+)
 
 if TYPE_CHECKING:
     from src.core.config import Settings
@@ -86,6 +90,7 @@ class CircuitBreaker:
                 elapsed = time.monotonic() - self.last_failure_time
                 if elapsed >= self.recovery_timeout:
                     self.state = CircuitState.HALF_OPEN
+                    llm_circuit_breaker_state.set(1)
                     logger.info(
                         "circuit_half_open",
                         elapsed_seconds=round(elapsed, 1),
@@ -107,6 +112,7 @@ class CircuitBreaker:
                 logger.info("circuit_closed", reason="probe_success")
             self.failure_count = 0
             self.state = CircuitState.CLOSED
+            llm_circuit_breaker_state.set(0)
 
     async def record_failure(self) -> None:
         """Record a failed API call."""
@@ -116,12 +122,14 @@ class CircuitBreaker:
 
             if self.state == CircuitState.HALF_OPEN:
                 self.state = CircuitState.OPEN
+                llm_circuit_breaker_state.set(2)
                 logger.warning(
                     "circuit_opened",
                     reason="probe_failed",
                 )
             elif self.failure_count >= self.failure_threshold:
                 self.state = CircuitState.OPEN
+                llm_circuit_breaker_state.set(2)
                 logger.warning(
                     "circuit_opened",
                     failure_count=self.failure_count,
@@ -149,12 +157,8 @@ class LLMGateway:
         self._max_retries = settings.llm_max_retries
 
         # ADR-004: Token bucket for RPM + semaphore for concurrency
-        self._rate_limiter = AsyncLimiter(
-            settings.llm_rate_limit_rpm, 60
-        )
-        self._semaphore = asyncio.Semaphore(
-            settings.llm_concurrency_limit
-        )
+        self._rate_limiter = AsyncLimiter(settings.llm_rate_limit_rpm, 60)
+        self._semaphore = asyncio.Semaphore(settings.llm_concurrency_limit)
 
         # ADR-009: In-process circuit breaker
         self._circuit = CircuitBreaker(
@@ -174,7 +178,7 @@ class LLMGateway:
             logger.info("llm_client_initialized", model=self._model_name)
         return self._client
 
-    async def complete(self, prompt: str) -> str:
+    async def complete(self, prompt: str, operation: str = "completion") -> str:
         """Send a prompt to the LLM and return the response text.
 
         Flow:
@@ -201,12 +205,16 @@ class LLMGateway:
             try:
                 result = await self._call_with_retry(prompt)
                 await self._circuit.record_success()
+                llm_requests_total.labels(
+                    provider="gemini", operation=operation, outcome="success"
+                ).inc()
                 return result
             except Exception as exc:
                 await self._circuit.record_failure()
-                raise ExternalServiceError(
-                    "LLM", str(exc)
-                ) from exc
+                llm_requests_total.labels(
+                    provider="gemini", operation=operation, outcome="error"
+                ).inc()
+                raise ExternalServiceError("LLM", str(exc)) from exc
 
     async def _call_with_retry(self, prompt: str) -> str:
         """Execute the LLM call with tenacity retry."""
@@ -221,7 +229,8 @@ class LLMGateway:
             client = self._get_client()
             response = await asyncio.wait_for(
                 asyncio.to_thread(
-                    client.generate_content, prompt  # type: ignore[union-attr]
+                    client.generate_content,
+                    prompt,  # type: ignore[union-attr]
                 ),
                 timeout=self._timeout,
             )

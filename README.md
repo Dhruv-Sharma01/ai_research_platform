@@ -12,6 +12,7 @@ This project solves these challenges by adopting a **Postgres-Maximalist** philo
 
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
+| Frontend | Next.js (React) | Multi-tenant SaaS UI with role-based access control |
 | API | FastAPI | Async HTTP API with JWT auth |
 | Database | PostgreSQL 16 + pgvector | Relational data, vectors, full-text, job queue, RLS |
 | Tenancy | PostgreSQL RLS + organizations | Tenant isolation and RBAC |
@@ -26,10 +27,13 @@ This project solves these challenges by adopting a **Postgres-Maximalist** philo
 
 The platform is designed around several key technical implementations:
 
-1. **Hybrid Retrieval:** Dense retrieval (HNSW index on `pgvector`) and sparse retrieval (GIN index on `tsvector`) are executed concurrently as parallel SQL queries, fused in-memory using Reciprocal Rank Fusion (RRF).
-2. **PostgreSQL Job Queue:** Document ingestion is handled via a Python polling daemon leveraging PostgreSQL's `SELECT ... FOR UPDATE SKIP LOCKED` for transactional, exactly-once job enqueuing and processing, eliminating the need for Celery/Redis.
-3. **Multi-Tenancy:** PostgreSQL Row-Level Security (RLS) enforces tenant isolation at the database layer. Every query is filtered by the database itself using a session variable set via FastAPI middleware.
-4. **Resiliency:** Rate limits are enforced via token buckets (`aiolimiter`), and external LLM APIs are guarded by in-process circuit breakers and exponential backoff retry mechanisms (`tenacity`).
+- **Multi-Tenant Architecture**: Robust data isolation using PostgreSQL Row-Level Security (RLS) patterns and tenant-aware routing.
+- **PostgreSQL-Powered**: Uses PostgreSQL for strict state management, tenant isolation, pgvector for dense embeddings, full-text search for sparse keyword matching, and SKIP LOCKED for scalable background job queues.
+- **Fail-Open Rate Limiting**: Redis-backed distributed rate limiting via atomic Lua scripts to prevent API abuse, prioritizing availability if the cache goes down.
+- **Hybrid Retrieval**: Asynchronous concurrent database queries combining Dense (semantic) + Sparse (keyword) search using Reciprocal Rank Fusion (RRF).
+- **Asynchronous Ingestion**: Fault-tolerant background workers to process, chunk, and embed documents in isolation.
+- **Extensible LLM Gateway**: Integration with Google Gemini for RAG response generation, wrapped in an asynchronous circuit breaker.
+- **Deep Observability**: Out-of-the-box Prometheus instrumentation tracking API latency, database connection pools, LLM usage, and circuit-breaker state metrics.
 
 ### Project Structure
 ```
@@ -46,6 +50,10 @@ ai-research-platform/
 │   ├── observability/        # Prometheus metrics, health checks (v3.0)
 │   └── main.py               # FastAPI application factory
 ├── mcp_server/               # MCP stdio interface
+├── frontend/                 # Next.js React frontend
+│   ├── src/app/              # App router pages (dashboard, invites, etc.)
+│   ├── src/components/       # Reusable React components (TenantProvider, Header)
+│   └── src/lib/              # Frontend API client and permissions logic
 ├── tests/
 │   ├── unit/                 # Pure logic tests
 │   ├── integration/          # Tests requiring running services
@@ -66,7 +74,7 @@ ai-research-platform/
 
 - Python 3.11+
 - Git
-- Docker and Docker Compose (for PostgreSQL and MinIO)
+- Make sure you have Docker and Docker Compose installed.
 
 ### Setup Instructions
 
@@ -87,12 +95,19 @@ ai-research-platform/
    source .venv/bin/activate
    ```
 
-3. **Install dependencies**
+3. **Install backend dependencies**
    ```bash
    pip install -r requirements.in
    ```
 
-4. **Configure environment variables**
+4. **Install frontend dependencies**
+   ```bash
+   cd frontend
+   npm install
+   cd ..
+   ```
+
+5. **Configure environment variables**
    ```bash
    # Windows:
    copy .env.example .env
@@ -103,10 +118,23 @@ ai-research-platform/
    # Make sure to edit .env with your specific API keys (e.g., GEMINI_API_KEY)
    ```
 
-5. **Start Infrastructure Services (PostgreSQL + MinIO)**
-   ```bash
-   docker compose -f docker/docker-compose.yml up -d
-   ```
+5. **Start Infrastructure Services**
+
+### Production Environment
+
+To run the full production-ready stack (2x API instances, 2x Workers, PostgreSQL, Redis, MinIO, Nginx, Prometheus, Grafana):
+
+```bash
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+### Local Development
+
+To run the infrastructure backing the app:
+
+```bash
+docker-compose up -d
+```
 
 6. **Run database migrations**
    ```bash
@@ -125,14 +153,21 @@ ai-research-platform/
    ```bash
    python -m src.ingestion.worker
    ```
+
+   **Terminal 3 (Frontend):**
+   ```bash
+   cd frontend
+   npm run dev
+   ```
    
-   **Terminal 3 (Optional: MCP Server):**
+   **Terminal 4 (Optional: MCP Server):**
    ```bash
    python -m mcp_server
    ```
 
-### Accessing the API
-Once the server is running, visit:
+### Accessing the Application
+Once the servers are running, visit:
+- **Frontend App:** http://localhost:3000
 - **Swagger UI:** http://localhost:8000/docs
 - **ReDoc:** http://localhost:8000/redoc
 - **Health Check:** http://localhost:8000/health

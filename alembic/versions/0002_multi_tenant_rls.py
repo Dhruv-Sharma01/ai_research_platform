@@ -77,9 +77,7 @@ def upgrade() -> None:
         ),
         sa.UniqueConstraint("org_id", "user_id", name="uq_org_memberships_org_user"),
     )
-    op.create_index(
-        "ix_org_memberships_user", "org_memberships", ["user_id"]
-    )
+    op.create_index("ix_org_memberships_user", "org_memberships", ["user_id"])
 
     op.execute(
         """
@@ -205,7 +203,9 @@ def downgrade() -> None:
         "ingestion_jobs",
         type_="foreignkey",
     )
-    op.drop_constraint("fk_chunks_tenant_id_organizations", "chunks", type_="foreignkey")
+    op.drop_constraint(
+        "fk_chunks_tenant_id_organizations", "chunks", type_="foreignkey"
+    )
     op.drop_constraint(
         "fk_documents_tenant_id_organizations", "documents", type_="foreignkey"
     )

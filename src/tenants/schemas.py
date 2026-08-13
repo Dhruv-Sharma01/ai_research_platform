@@ -42,3 +42,25 @@ class TenantContext(BaseModel):
 
     org_id: uuid.UUID
     role: str
+
+
+class OrganizationInviteCreateRequest(BaseModel):
+    """Request body for inviting a user."""
+
+    email: str = Field(pattern=r"^[^@]+@[^@]+\.[^@]+$")
+    role: str = Field(default="viewer", pattern="^(admin|editor|viewer)$")
+
+
+class OrganizationInviteResponse(BaseModel):
+    """Public representation of an organization invite."""
+
+    id: uuid.UUID
+    org_id: uuid.UUID
+    email: str
+    role: str
+    status: str
+    expires_at: datetime
+    created_at: datetime
+    organization: OrganizationResponse
+
+    model_config = {"from_attributes": True}

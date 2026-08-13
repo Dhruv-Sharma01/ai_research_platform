@@ -84,12 +84,11 @@ _llm_rate_limiter = AsyncLimiter(15, 60)
 # Concurrency: max 5 simultaneous in-flight calls
 _llm_concurrency = asyncio.Semaphore(5)
 
+
 async def guarded_llm_call(llm, prompt: str) -> str:
-    await _llm_rate_limiter.acquire()          # Enforces RPM
-    async with _llm_concurrency:               # Bounds concurrency
-        return await asyncio.wait_for(
-            llm.acomplete(prompt), timeout=30
-        )
+    await _llm_rate_limiter.acquire()  # Enforces RPM
+    async with _llm_concurrency:  # Bounds concurrency
+        return await asyncio.wait_for(llm.acomplete(prompt), timeout=30)
 ```
 
 ---
@@ -136,7 +135,9 @@ The roadmap proposed SQLAlchemy `do_orm_execute` event hooks with PostgreSQL RLS
 async def set_tenant_context(request: Request, call_next):
     tenant_id = get_tenant_from_jwt(request)
     async with get_db() as db:
-        await db.execute(text("SET LOCAL app.current_tenant = :tid"), {"tid": str(tenant_id)})
+        await db.execute(
+            text("SET LOCAL app.current_tenant = :tid"), {"tid": str(tenant_id)}
+        )
         request.state.db = db
         return await call_next(request)
 ```

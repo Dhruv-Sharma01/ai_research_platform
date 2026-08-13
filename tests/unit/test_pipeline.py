@@ -11,7 +11,6 @@ from src.ingestion.pipeline import (
     extract_text,
 )
 
-
 # ── Mock Embedder ────────────────────────────────────────────
 
 

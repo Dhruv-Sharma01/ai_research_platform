@@ -33,9 +33,7 @@ class TestCursorEncoding:
         import base64
         import json
 
-        bad_cursor = base64.urlsafe_b64encode(
-            json.dumps([1, 2, 3]).encode()
-        ).decode()
+        bad_cursor = base64.urlsafe_b64encode(json.dumps([1, 2, 3]).encode()).decode()
         with pytest.raises(ValueError, match="JSON object"):
             decode_cursor(bad_cursor)
 

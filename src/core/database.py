@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import DeclarativeBase
 
 from src.core.config import Settings
+from src.observability.metrics import db_pool_checkedout, db_pool_size
 
 # Naming conventions for auto-generated constraint names.
 # Alembic uses these to produce deterministic, readable migration names.
@@ -65,6 +66,15 @@ class Database:
                 pool_timeout=self._settings.database_pool_timeout,
                 pool_recycle=self._settings.database_pool_recycle,
                 echo=False,
+            )
+            # Link connection pool metrics to Prometheus gauges
+            db_pool_size.set_function(
+                lambda: self._engine.sync_engine.pool.size() if self._engine else 0  # type: ignore[attr-defined]
+            )
+            db_pool_checkedout.set_function(
+                lambda: (
+                    self._engine.sync_engine.pool.checkedout() if self._engine else 0  # type: ignore[attr-defined]
+                )
             )
         return self._engine
 

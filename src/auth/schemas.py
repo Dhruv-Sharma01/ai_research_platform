@@ -8,9 +8,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
-_EMAIL_RE = re.compile(
-    r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-)
+_EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 
 
 # ── Requests ─────────────────────────────────────────────────

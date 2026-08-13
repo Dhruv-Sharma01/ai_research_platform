@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
+
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, Index, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.core.database import Base
+
+if TYPE_CHECKING:
+    from src.documents.models import Document
+    from src.tenants.models import OrgMembership
 
 
 class User(Base):
@@ -29,7 +35,7 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=text("now()"),
-        onupdate=datetime.utcnow,
+        onupdate=lambda: datetime.now(UTC),
     )
 
     # ── Relationships (use strings to avoid circular imports) ─
@@ -39,20 +45,18 @@ class User(Base):
     refresh_tokens: Mapped[list[RefreshToken]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
-    documents: Mapped[list["Document"]] = relationship(
+    documents: Mapped[list[Document]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
         foreign_keys="[Document.user_id]",
     )
-    org_memberships: Mapped[list["OrgMembership"]] = relationship(
+    org_memberships: Mapped[list[OrgMembership]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
         foreign_keys="[OrgMembership.user_id]",
     )
 
-    __table_args__ = (
-        Index("ix_users_email", "email"),
-    )
+    __table_args__ = (Index("ix_users_email", "email"),)
 
     def __repr__(self) -> str:
         return f"<User id={self.id} email={self.email}>"
@@ -78,12 +82,8 @@ class ApiKey(Base):
     key_hash: Mapped[str] = mapped_column(String(255))
     name: Mapped[str] = mapped_column(String(100))
     is_active: Mapped[bool] = mapped_column(default=True)
-    expires_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
-    last_used_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")
     )

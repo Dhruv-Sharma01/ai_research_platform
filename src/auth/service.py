@@ -7,7 +7,7 @@ to these functions and never execute queries directly.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -95,9 +95,7 @@ async def login_user(
     if not user.is_active:
         raise AuthenticationError("Account is deactivated.")
 
-    access_token = create_access_token(
-        str(user.id), user.email, settings
-    )
+    access_token = create_access_token(str(user.id), user.email, settings)
     raw_refresh, refresh_hash, expires_at = generate_refresh_token(settings)
 
     refresh = RefreshToken(
@@ -144,7 +142,7 @@ async def refresh_access_token(
     if stored is None:
         raise AuthenticationError("Invalid refresh token.")
 
-    if stored.expires_at < datetime.now(timezone.utc):
+    if stored.expires_at < datetime.now(UTC):
         # Clean up expired token
         await db.delete(stored)
         await db.flush()
@@ -157,9 +155,7 @@ async def refresh_access_token(
     await db.delete(stored)
 
     # Issue new tokens
-    access_token = create_access_token(
-        str(stored.user.id), stored.user.email, settings
-    )
+    access_token = create_access_token(str(stored.user.id), stored.user.email, settings)
     new_raw, new_hash, new_expires = generate_refresh_token(settings)
 
     new_refresh = RefreshToken(

@@ -1,4 +1,10 @@
-"""Search API routes."""
+"""Search API routes.
+
+Endpoints:
+    POST /search           — Hybrid (dense + sparse + RRF)
+    POST /search/semantic  — Dense-only (pgvector cosine)
+    POST /search/keyword   — Sparse-only (tsvector ts_rank_cd)
+"""
 
 from __future__ import annotations
 
@@ -28,6 +34,19 @@ def _get_embedder(request: Request) -> Embedder:
     return request.app.state.embedder
 
 
+def _ranked_to_result(r: search_service.RankedChunk) -> ChunkResult:
+    """Convert a RankedChunk dataclass to a ChunkResult schema."""
+    return ChunkResult(
+        chunk_id=r.chunk_id,
+        document_id=r.document_id,
+        content=r.content,
+        chunk_index=r.chunk_index,
+        page_number=r.page_number,
+        score=r.score,
+        document_filename=r.document_filename,
+    )
+
+
 @router.post("", response_model=SearchResponse)
 async def search(
     body: SearchRequest,
@@ -54,17 +73,50 @@ async def search(
 
     return SearchResponse(
         query=body.query,
-        results=[
-            ChunkResult(
-                chunk_id=r.chunk_id,
-                document_id=r.document_id,
-                content=r.content,
-                chunk_index=r.chunk_index,
-                page_number=r.page_number,
-                score=r.score,
-                document_filename=r.document_filename,
-            )
-            for r in results
-        ],
+        results=[_ranked_to_result(r) for r in results],
+        total=len(results),
+    )
+
+
+@router.post("/semantic", response_model=SearchResponse)
+async def semantic_search(
+    body: SearchRequest,
+    user: User = Depends(get_current_user),
+    tenant: TenantContext = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+    embedder: Embedder = Depends(_get_embedder),
+) -> SearchResponse:
+    """Dense-only search using pgvector cosine similarity."""
+    results = await search_service.dense_search(
+        query=body.query,
+        tenant_id=tenant.org_id,
+        embedder=embedder,
+        db=db,
+        top_k=body.top_k,
+    )
+    return SearchResponse(
+        query=body.query,
+        results=[_ranked_to_result(r) for r in results],
+        total=len(results),
+    )
+
+
+@router.post("/keyword", response_model=SearchResponse)
+async def keyword_search(
+    body: SearchRequest,
+    user: User = Depends(get_current_user),
+    tenant: TenantContext = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> SearchResponse:
+    """Sparse-only search using PostgreSQL tsvector full-text search."""
+    results = await search_service.sparse_search(
+        query=body.query,
+        tenant_id=tenant.org_id,
+        db=db,
+        top_k=body.top_k,
+    )
+    return SearchResponse(
+        query=body.query,
+        results=[_ranked_to_result(r) for r in results],
         total=len(results),
     )

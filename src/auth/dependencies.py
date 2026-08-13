@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -52,9 +52,7 @@ async def get_db_session(
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(
-        _bearer_scheme
-    ),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
     db: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> User:
@@ -91,9 +89,7 @@ async def _authenticate_jwt(
     """Validate a JWT access token and return the associated user."""
     payload = decode_access_token(token, settings)
 
-    result = await db.execute(
-        select(User).where(User.id == uuid.UUID(payload.user_id))
-    )
+    result = await db.execute(select(User).where(User.id == uuid.UUID(payload.user_id)))
     user = result.scalar_one_or_none()
 
     if user is None:
@@ -127,7 +123,7 @@ async def _authenticate_api_key(
             if not key.user.is_active:
                 raise AuthenticationError("Account is deactivated.")
             # Update last-used timestamp
-            key.last_used_at = datetime.now(timezone.utc)
+            key.last_used_at = datetime.now(UTC)
             return key.user
 
     raise AuthenticationError("Invalid API key.")

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,7 +14,11 @@ from src.tenants.schemas import (
     MembershipResponse,
     OrganizationCreateRequest,
     OrganizationResponse,
+    OrganizationInviteCreateRequest,
+    OrganizationInviteResponse,
 )
+from src.tenants.dependencies import get_current_tenant
+from src.tenants.schemas import TenantContext
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 
@@ -41,3 +47,48 @@ async def list_organizations(
     """List organizations available to the current user."""
     memberships = await tenant_service.list_memberships(user_id=user.id, db=db)
     return [MembershipResponse.model_validate(item) for item in memberships]
+
+
+@router.post("/invites", response_model=OrganizationInviteResponse, status_code=201)
+async def create_invite(
+    body: OrganizationInviteCreateRequest,
+    user: User = Depends(get_current_user),
+    tenant: TenantContext = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> OrganizationInviteResponse:
+    """Create a new invitation for a user to join the current organization."""
+    tenant_service.require_role(tenant.role, {"admin"})
+    invite = await tenant_service.create_invite(
+        org_id=tenant.org_id,
+        email=body.email,
+        role=body.role,
+        inviter_id=user.id,
+        db=db,
+    )
+    return OrganizationInviteResponse.model_validate(invite)
+
+
+@router.get("/invites/pending", response_model=list[OrganizationInviteResponse])
+async def list_pending_invites(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[OrganizationInviteResponse]:
+    """List pending organization invites for the authenticated user's email."""
+    invites = await tenant_service.list_pending_invites(email=user.email, db=db)
+    return [OrganizationInviteResponse.model_validate(i) for i in invites]
+
+
+@router.post("/invites/{invite_id}/accept", response_model=MembershipResponse)
+async def accept_invite(
+    invite_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
+) -> MembershipResponse:
+    """Accept an invitation to join an organization."""
+    membership = await tenant_service.accept_invite(
+        invite_id=invite_id,
+        user_id=user.id,
+        email=user.email,
+        db=db,
+    )
+    return MembershipResponse.model_validate(membership)

@@ -15,7 +15,6 @@ from src.evaluation.llm_gateway import CircuitBreaker, CircuitState, LLMGateway
 from src.evaluation.schemas import RelevanceGrade, RelevanceRequest
 from src.evaluation.service import _parse_grade
 
-
 # ── Circuit Breaker ──────────────────────────────────────────
 
 
@@ -27,24 +26,17 @@ class TestCircuitBreaker:
     async def test_starts_closed(self, breaker: CircuitBreaker) -> None:
         assert breaker.state == CircuitState.CLOSED
 
-    async def test_stays_closed_below_threshold(
-        self, breaker: CircuitBreaker
-    ) -> None:
+    async def test_stays_closed_below_threshold(self, breaker: CircuitBreaker) -> None:
         await breaker.record_failure()
         await breaker.record_failure()
         assert breaker.state == CircuitState.CLOSED
 
-
-    async def test_opens_at_threshold(
-        self, breaker: CircuitBreaker
-    ) -> None:
+    async def test_opens_at_threshold(self, breaker: CircuitBreaker) -> None:
         for _ in range(3):
             await breaker.record_failure()
         assert breaker.state == CircuitState.OPEN
 
-    async def test_open_rejects_requests(
-        self, breaker: CircuitBreaker
-    ) -> None:
+    async def test_open_rejects_requests(self, breaker: CircuitBreaker) -> None:
         for _ in range(3):
             await breaker.record_failure()
 
@@ -65,9 +57,7 @@ class TestCircuitBreaker:
         await breaker.check()  # Should not raise
         assert breaker.state == CircuitState.HALF_OPEN
 
-    async def test_half_open_closes_on_success(
-        self, breaker: CircuitBreaker
-    ) -> None:
+    async def test_half_open_closes_on_success(self, breaker: CircuitBreaker) -> None:
         for _ in range(3):
             await breaker.record_failure()
         await asyncio.sleep(0.15)
@@ -76,9 +66,7 @@ class TestCircuitBreaker:
         await breaker.record_success()
         assert breaker.state == CircuitState.CLOSED
 
-    async def test_half_open_reopens_on_failure(
-        self, breaker: CircuitBreaker
-    ) -> None:
+    async def test_half_open_reopens_on_failure(self, breaker: CircuitBreaker) -> None:
         for _ in range(3):
             await breaker.record_failure()
         await asyncio.sleep(0.15)
@@ -87,9 +75,7 @@ class TestCircuitBreaker:
         await breaker.record_failure()
         assert breaker.state == CircuitState.OPEN
 
-    async def test_success_resets_failure_count(
-        self, breaker: CircuitBreaker
-    ) -> None:
+    async def test_success_resets_failure_count(self, breaker: CircuitBreaker) -> None:
         await breaker.record_failure()
         await breaker.record_failure()
         await breaker.record_success()

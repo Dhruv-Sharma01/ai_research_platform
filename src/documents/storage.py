@@ -67,9 +67,7 @@ class ObjectStorage:
         except ClientError as exc:
             raise ExternalServiceError("MinIO", str(exc)) from exc
 
-    async def upload(
-        self, key: str, data: bytes, content_type: str
-    ) -> None:
+    async def upload(self, key: str, data: bytes, content_type: str) -> None:
         """Upload an object to the bucket."""
         try:
             await asyncio.to_thread(
@@ -87,9 +85,7 @@ class ObjectStorage:
         """Download an object from the bucket."""
 
         def _download() -> bytes:
-            response = self._client.get_object(
-                Bucket=self._bucket, Key=key
-            )
+            response = self._client.get_object(Bucket=self._bucket, Key=key)
             return response["Body"].read()
 
         try:

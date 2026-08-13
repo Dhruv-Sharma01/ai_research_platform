@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
-
-from src.ingestion.pipeline import SemanticTextChunker, RecursiveTextChunker
+from src.ingestion.pipeline import SemanticTextChunker
 
 
 class ContentSensitiveMockEmbedder:
@@ -22,9 +20,17 @@ class ContentSensitiveMockEmbedder:
         for text in texts:
             vec = [0.0] * self._dim
             # Standardize vectors so dot product equals cosine similarity
-            if "finance" in text.lower() or "revenue" in text.lower() or "money" in text.lower():
+            if (
+                "finance" in text.lower()
+                or "revenue" in text.lower()
+                or "money" in text.lower()
+            ):
                 vec[0] = 1.0
-            elif "vacation" in text.lower() or "beach" in text.lower() or "holiday" in text.lower():
+            elif (
+                "vacation" in text.lower()
+                or "beach" in text.lower()
+                or "holiday" in text.lower()
+            ):
                 vec[1] = 1.0
             else:
                 vec[2] = 1.0

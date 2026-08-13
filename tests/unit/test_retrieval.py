@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from src.retrieval.service import _reciprocal_rank_fusion, RRF_K
+from src.retrieval.service import RRF_K, _reciprocal_rank_fusion
 
 
 def _make_row(

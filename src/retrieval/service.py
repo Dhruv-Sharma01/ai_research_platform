@@ -8,10 +8,14 @@ This implements the core search pipeline:
    ``ts_rank_cd`` using the GIN index on the ``tsv`` column.
 3. Reciprocal Rank Fusion (RRF): Merge both ranked lists into a single
    ranked list using the formula ``1 / (k + rank)`` with ``k = 60``.
+
+Dense and sparse searches are also available independently via
+``dense_search()`` and ``sparse_search()``.
 """
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from dataclasses import dataclass
 
@@ -25,6 +29,41 @@ logger = get_logger(__name__)
 
 # RRF constant — standard value from the original RRF paper.
 RRF_K: int = 60
+
+# ── SQL fragments ────────────────────────────────────────────
+
+_DENSE_SQL = text("""
+    SELECT c.id AS chunk_id,
+           c.document_id,
+           c.content,
+           c.chunk_index,
+           c.page_number,
+           d.filename AS document_filename,
+           (c.embedding <=> CAST(:query_vec AS vector)) AS distance
+    FROM chunks c
+    JOIN documents d ON c.document_id = d.id
+    WHERE c.tenant_id = :tenant_id
+      AND d.deleted_at IS NULL
+    ORDER BY c.embedding <=> CAST(:query_vec AS vector)
+    LIMIT :limit
+""")
+
+_SPARSE_SQL = text("""
+    SELECT c.id AS chunk_id,
+           c.document_id,
+           c.content,
+           c.chunk_index,
+           c.page_number,
+           d.filename AS document_filename,
+           ts_rank_cd(c.tsv, plainto_tsquery('english', :query)) AS rank
+    FROM chunks c
+    JOIN documents d ON c.document_id = d.id
+    WHERE c.tenant_id = :tenant_id
+      AND d.deleted_at IS NULL
+      AND c.tsv @@ plainto_tsquery('english', :query)
+    ORDER BY rank DESC
+    LIMIT :limit
+""")
 
 
 @dataclass
@@ -40,6 +79,111 @@ class RankedChunk:
     document_filename: str
 
 
+# ── Individual search functions ──────────────────────────────
+
+
+async def dense_search(
+    query: str,
+    tenant_id: uuid.UUID,
+    embedder: Embedder,
+    db: AsyncSession,
+    top_k: int = 5,
+) -> list[RankedChunk]:
+    """Dense-only retrieval using pgvector cosine distance.
+
+    Args:
+        query: User's search query.
+        tenant_id: Tenant scope.
+        embedder: Embedding model.
+        db: Async database session.
+        top_k: Number of results.
+
+    Returns:
+        List of RankedChunk sorted by cosine similarity (best first).
+    """
+    query_embedding = embedder.encode([query])[0]
+    result = await db.execute(
+        _DENSE_SQL,
+        {
+            "query_vec": str(query_embedding),
+            "tenant_id": str(tenant_id),
+            "limit": top_k,
+        },
+    )
+    rows = result.mappings().all()
+
+    ranked = [
+        RankedChunk(
+            chunk_id=uuid.UUID(str(row["chunk_id"])),
+            document_id=uuid.UUID(str(row["document_id"])),
+            content=row["content"],
+            chunk_index=row["chunk_index"],
+            page_number=row.get("page_number"),
+            score=round(1.0 - float(row["distance"]), 6),  # cosine similarity
+            document_filename=row["document_filename"],
+        )
+        for row in rows
+    ]
+
+    logger.info(
+        "dense_search_complete",
+        query_length=len(query),
+        results=len(ranked),
+    )
+    return ranked
+
+
+async def sparse_search(
+    query: str,
+    tenant_id: uuid.UUID,
+    db: AsyncSession,
+    top_k: int = 5,
+) -> list[RankedChunk]:
+    """Sparse-only retrieval using PostgreSQL tsvector full-text search.
+
+    Args:
+        query: User's search query.
+        tenant_id: Tenant scope.
+        db: Async database session.
+        top_k: Number of results.
+
+    Returns:
+        List of RankedChunk sorted by ts_rank_cd score (best first).
+    """
+    result = await db.execute(
+        _SPARSE_SQL,
+        {
+            "query": query,
+            "tenant_id": str(tenant_id),
+            "limit": top_k,
+        },
+    )
+    rows = result.mappings().all()
+
+    ranked = [
+        RankedChunk(
+            chunk_id=uuid.UUID(str(row["chunk_id"])),
+            document_id=uuid.UUID(str(row["document_id"])),
+            content=row["content"],
+            chunk_index=row["chunk_index"],
+            page_number=row.get("page_number"),
+            score=round(float(row["rank"]), 6),
+            document_filename=row["document_filename"],
+        )
+        for row in rows
+    ]
+
+    logger.info(
+        "sparse_search_complete",
+        query_length=len(query),
+        results=len(ranked),
+    )
+    return ranked
+
+
+# ── Hybrid search (ADR-005: parallel via asyncio.gather) ─────
+
+
 async def hybrid_search(
     query: str,
     user_id: uuid.UUID,
@@ -51,9 +195,12 @@ async def hybrid_search(
 ) -> list[RankedChunk]:
     """Execute a hybrid search combining dense and sparse retrieval.
 
+    Both retrievals run concurrently via ``asyncio.gather`` (ADR-005).
+
     Args:
         query: User's search query.
         user_id: Authenticated user; tenant membership is checked by caller.
+        tenant_id: Tenant scope for RLS-compatible queries.
         embedder: Embedding model for dense retrieval.
         db: Async database session.
         top_k: Number of results to return.
@@ -65,62 +212,36 @@ async def hybrid_search(
     """
     candidates = top_k * candidate_multiplier
 
-    # ── Dense retrieval (pgvector cosine similarity) ─────────
+    # Embed query (CPU-bound, done once before both searches)
     query_embedding = embedder.encode([query])[0]
 
-    dense_results = await db.execute(
-        text(
-            """
-            SELECT c.id AS chunk_id,
-                   c.document_id,
-                   c.content,
-                   c.chunk_index,
-                   c.page_number,
-                   d.filename AS document_filename,
-                   (c.embedding <=> :query_vec::vector) AS distance
-            FROM chunks c
-            JOIN documents d ON c.document_id = d.id
-            WHERE c.tenant_id = :tenant_id
-              AND d.deleted_at IS NULL
-            ORDER BY c.embedding <=> :query_vec::vector
-            LIMIT :limit
-            """
-        ),
-        {
-            "query_vec": str(query_embedding),
-            "tenant_id": str(tenant_id),
-            "limit": candidates,
-        },
-    )
-    dense_rows = dense_results.mappings().all()
+    # ADR-005: Run dense + sparse in parallel using independent sessions
+    async def _run_dense() -> list[dict]:
+        async with AsyncSession(bind=db.bind) as session:
+            result = await session.execute(
+                _DENSE_SQL,
+                {
+                    "query_vec": str(query_embedding),
+                    "tenant_id": str(tenant_id),
+                    "limit": candidates,
+                },
+            )
+            return [dict(r) for r in result.mappings().all()]
 
-    # ── Sparse retrieval (tsvector full-text search) ─────────
-    sparse_results = await db.execute(
-        text(
-            """
-            SELECT c.id AS chunk_id,
-                   c.document_id,
-                   c.content,
-                   c.chunk_index,
-                   c.page_number,
-                   d.filename AS document_filename,
-                   ts_rank_cd(c.tsv, plainto_tsquery('english', :query)) AS rank
-            FROM chunks c
-            JOIN documents d ON c.document_id = d.id
-            WHERE c.tenant_id = :tenant_id
-              AND d.deleted_at IS NULL
-              AND c.tsv @@ plainto_tsquery('english', :query)
-            ORDER BY rank DESC
-            LIMIT :limit
-            """
-        ),
-        {
-            "query": query,
-            "tenant_id": str(tenant_id),
-            "limit": candidates,
-        },
-    )
-    sparse_rows = sparse_results.mappings().all()
+    async def _run_sparse() -> list[dict]:
+        async with AsyncSession(bind=db.bind) as session:
+            result = await session.execute(
+                _SPARSE_SQL,
+                {
+                    "query": query,
+                    "tenant_id": str(tenant_id),
+                    "limit": candidates,
+                },
+            )
+            return [dict(r) for r in result.mappings().all()]
+
+    # Run concurrently using asyncio.gather
+    dense_rows, sparse_rows = await asyncio.gather(_run_dense(), _run_sparse())
 
     # ── Reciprocal Rank Fusion ───────────────────────────────
     fused = _reciprocal_rank_fusion(dense_rows, sparse_rows, top_k)

@@ -7,7 +7,7 @@ Create Date: 2026-08-06
 
 from __future__ import annotations
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
@@ -15,9 +15,9 @@ from pgvector.sqlalchemy import Vector
 
 # revision identifiers, used by Alembic.
 revision: str = "0001"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 EMBEDDING_DIM = 384
 
@@ -38,7 +38,9 @@ def upgrade() -> None:
         ),
         sa.Column("email", sa.String(255), nullable=False),
         sa.Column("password_hash", sa.String(255), nullable=False),
-        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+        sa.Column(
+            "is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")
+        ),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -73,7 +75,9 @@ def upgrade() -> None:
         sa.Column("key_prefix", sa.String(12), nullable=False),
         sa.Column("key_hash", sa.String(255), nullable=False),
         sa.Column("name", sa.String(100), nullable=False),
-        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+        sa.Column(
+            "is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")
+        ),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("last_used_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
@@ -104,9 +108,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("token_hash", sa.String(64), nullable=False),
-        sa.Column(
-            "expires_at", sa.DateTime(timezone=True), nullable=False
-        ),
+        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -290,9 +292,7 @@ def upgrade() -> None:
         sa.Column("error_message", sa.Text(), nullable=True),
         sa.Column("claimed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column(
-            "completed_at", sa.DateTime(timezone=True), nullable=True
-        ),
+        sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -303,8 +303,7 @@ def upgrade() -> None:
             "user_id", "idempotency_key", name="uq_jobs_user_idempotency"
         ),
         sa.CheckConstraint(
-            "status IN ('queued', 'claimed', 'running', "
-            "'completed', 'failed', 'dead')",
+            "status IN ('queued', 'claimed', 'running', 'completed', 'failed', 'dead')",
             name="ck_jobs_status_valid",
         ),
     )
@@ -313,9 +312,7 @@ def upgrade() -> None:
         "ON ingestion_jobs (created_at ASC) "
         "WHERE status = 'queued'"
     )
-    op.create_index(
-        "ix_jobs_document_id", "ingestion_jobs", ["document_id"]
-    )
+    op.create_index("ix_jobs_document_id", "ingestion_jobs", ["document_id"])
 
 
 def downgrade() -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from datetime import UTC
 
 import pytest
 
@@ -18,7 +19,6 @@ from src.core.security import (
     verify_api_key,
     verify_password,
 )
-
 
 # ── Fixtures ─────────────────────────────────────────────────
 
@@ -134,9 +134,7 @@ class TestJWT:
 
 
 class TestRefreshTokens:
-    def test_generate_produces_unique_tokens(
-        self, auth_settings: Settings
-    ) -> None:
+    def test_generate_produces_unique_tokens(self, auth_settings: Settings) -> None:
         token1, _, _ = generate_refresh_token(auth_settings)
         token2, _, _ = generate_refresh_token(auth_settings)
         assert token1 != token2
@@ -145,17 +143,15 @@ class TestRefreshTokens:
         raw_token, stored_hash, _ = generate_refresh_token(auth_settings)
         assert hash_refresh_token(raw_token) == stored_hash
 
-    def test_wrong_token_does_not_match(
-        self, auth_settings: Settings
-    ) -> None:
+    def test_wrong_token_does_not_match(self, auth_settings: Settings) -> None:
         _, stored_hash, _ = generate_refresh_token(auth_settings)
         assert hash_refresh_token("wrong-token") != stored_hash
 
     def test_expiry_is_in_future(self, auth_settings: Settings) -> None:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         _, _, expires_at = generate_refresh_token(auth_settings)
-        assert expires_at > datetime.now(timezone.utc)
+        assert expires_at > datetime.now(UTC)
 
 
 # ── API Keys ─────────────────────────────────────────────────

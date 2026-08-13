@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import bcrypt
@@ -30,7 +30,7 @@ API_KEY_BYTE_LENGTH: int = 32
 class TokenPayload:
     """Decoded JWT access token payload."""
 
-    __slots__ = ("user_id", "email", "exp")
+    __slots__ = ("email", "exp", "user_id")
 
     def __init__(self, user_id: str, email: str, exp: float) -> None:
         self.user_id = user_id
@@ -76,7 +76,7 @@ def create_access_token(
 
     Token contains: sub (user_id), email, exp, iat, type.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expire = now + timedelta(minutes=settings.jwt_access_token_expire_minutes)
     payload: dict[str, Any] = {
         "sub": user_id,
@@ -137,7 +137,7 @@ def generate_refresh_token(
     """
     raw_token = secrets.token_urlsafe(API_KEY_BYTE_LENGTH)
     token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
-    expires_at = datetime.now(timezone.utc) + timedelta(
+    expires_at = datetime.now(UTC) + timedelta(
         days=settings.jwt_refresh_token_expire_days
     )
     return raw_token, token_hash, expires_at

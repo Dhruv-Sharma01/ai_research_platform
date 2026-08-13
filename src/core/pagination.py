@@ -27,9 +27,7 @@ def encode_cursor(data: dict[str, Any]) -> str:
     Returns:
         URL-safe base64 string.
     """
-    json_bytes = json.dumps(data, sort_keys=True, default=str).encode(
-        _ENCODING
-    )
+    json_bytes = json.dumps(data, sort_keys=True, default=str).encode(_ENCODING)
     return base64.urlsafe_b64encode(json_bytes).decode(_ENCODING)
 
 

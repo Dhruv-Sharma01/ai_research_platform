@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth.dependencies import get_current_user, get_db_session
 from src.auth.models import User
 from src.documents import service as doc_service
+from src.documents.chunk_schemas import ChunkListResponse, ChunkResponse
 from src.documents.schemas import (
     DocumentListResponse,
     DocumentResponse,
@@ -91,10 +92,34 @@ async def get_document(
     db: AsyncSession = Depends(get_db_session),
 ) -> DocumentResponse:
     """Get a single document by ID."""
-    doc = await doc_service.get_document(
-        document_id, user.id, tenant.org_id, db
-    )
+    doc = await doc_service.get_document(document_id, user.id, tenant.org_id, db)
     return DocumentResponse.model_validate(doc)
+
+
+@router.get("/{document_id}/chunks", response_model=ChunkListResponse)
+async def list_chunks(
+    document_id: uuid.UUID,
+    cursor: str | None = None,
+    limit: int = 20,
+    user: User = Depends(get_current_user),
+    tenant: TenantContext = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> ChunkListResponse:
+    """List chunks for a document with cursor pagination."""
+    # Verify the document exists and belongs to this tenant
+    await doc_service.get_document(document_id, user.id, tenant.org_id, db)
+    chunks, next_cursor = await doc_service.list_chunks(
+        document_id,
+        tenant.org_id,
+        db,
+        cursor=cursor,
+        limit=min(limit, 100),
+    )
+    return ChunkListResponse(
+        items=[ChunkResponse.model_validate(c) for c in chunks],
+        next_cursor=next_cursor,
+        has_more=next_cursor is not None,
+    )
 
 
 @router.delete("/{document_id}", status_code=204)

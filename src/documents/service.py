@@ -222,9 +222,7 @@ async def list_documents(
 
     if cursor:
         cursor_data = decode_cursor(cursor)
-        query = query.where(
-            Document.created_at < cursor_data["created_at"]
-        )
+        query = query.where(Document.created_at < cursor_data["created_at"])
 
     result = await db.execute(query)
     docs = list(result.scalars().all())
@@ -233,9 +231,7 @@ async def list_documents(
     if len(docs) > limit:
         docs = docs[:limit]
         last = docs[-1]
-        next_cursor = encode_cursor(
-            {"created_at": last.created_at.isoformat()}
-        )
+        next_cursor = encode_cursor({"created_at": last.created_at.isoformat()})
 
     return docs, next_cursor
 
@@ -303,3 +299,43 @@ async def soft_delete_document(
 
     await db.flush()
     logger.info("document_deleted", document_id=str(document_id))
+
+
+async def list_chunks(
+    document_id: uuid.UUID,
+    tenant_id: uuid.UUID,
+    db: AsyncSession,
+    cursor: str | None = None,
+    limit: int = 20,
+) -> tuple[list, str | None]:
+    """List chunks for a document with cursor pagination.
+
+    Returns:
+        Tuple of (chunks, next_cursor).
+    """
+    from src.ingestion.models import Chunk
+
+    query = (
+        select(Chunk)
+        .where(
+            Chunk.document_id == document_id,
+            Chunk.tenant_id == tenant_id,
+        )
+        .order_by(Chunk.chunk_index.asc())
+        .limit(limit + 1)
+    )
+
+    if cursor:
+        cursor_data = decode_cursor(cursor)
+        query = query.where(Chunk.chunk_index > int(cursor_data["chunk_index"]))
+
+    result = await db.execute(query)
+    chunks = list(result.scalars().all())
+
+    next_cursor = None
+    if len(chunks) > limit:
+        chunks = chunks[:limit]
+        last = chunks[-1]
+        next_cursor = encode_cursor({"chunk_index": last.chunk_index})
+
+    return chunks, next_cursor

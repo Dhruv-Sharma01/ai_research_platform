@@ -81,8 +81,7 @@ def _extract_pdf_text(content: bytes) -> str:
         from pypdf import PdfReader
     except ImportError as exc:
         raise ValidationError(
-            "PDF support requires pypdf. "
-            "Install with: pip install pypdf"
+            "PDF support requires pypdf. Install with: pip install pypdf"
         ) from exc
 
     reader = PdfReader(io.BytesIO(content))
@@ -111,9 +110,7 @@ class RecursiveTextChunker:
 
     _SEPARATORS = ["\n\n", "\n", ". ", " ", ""]
 
-    def __init__(
-        self, chunk_size: int = 512, chunk_overlap: int = 50
-    ) -> None:
+    def __init__(self, chunk_size: int = 512, chunk_overlap: int = 50) -> None:
         if chunk_overlap >= chunk_size:
             raise ValueError("chunk_overlap must be less than chunk_size.")
         self._chunk_size = chunk_size
@@ -218,7 +215,7 @@ class SemanticTextChunker:
             return []
 
         # Split into sentences
-        sentence_endings = re.compile(r'(?<=[.!?])\s+')
+        sentence_endings = re.compile(r"(?<=[.!?])\s+")
         sentences = [s.strip() for s in sentence_endings.split(text) if s.strip()]
 
         if len(sentences) <= 1:
@@ -297,7 +294,6 @@ class SemanticTextChunker:
 # ── Embedding ────────────────────────────────────────────────
 
 
-
 class SentenceTransformerEmbedder:
     """Embedding model backed by sentence-transformers.
 
@@ -320,9 +316,7 @@ class SentenceTransformerEmbedder:
             from sentence_transformers import SentenceTransformer
 
             self._model = SentenceTransformer(self._model_name)
-            logger.info(
-                "embedding_model_loaded", model=self._model_name
-            )
+            logger.info("embedding_model_loaded", model=self._model_name)
 
     def encode(self, texts: list[str]) -> list[list[float]]:
         """Encode texts into normalized embeddings."""
@@ -353,7 +347,6 @@ class IngestionPipeline:
         self._embedder = embedder
         self._chunker = chunker or RecursiveTextChunker()
 
-
     def process(
         self,
         content: bytes,
@@ -381,9 +374,7 @@ class IngestionPipeline:
         embeddings = self._embedder.encode(raw_chunks)
 
         results: list[ChunkData] = []
-        for idx, (chunk_text, embedding) in enumerate(
-            zip(raw_chunks, embeddings)
-        ):
+        for idx, (chunk_text, embedding) in enumerate(zip(raw_chunks, embeddings)):
             results.append(
                 ChunkData(
                     content=chunk_text,

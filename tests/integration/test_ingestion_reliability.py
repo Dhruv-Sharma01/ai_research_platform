@@ -61,6 +61,15 @@ async def live_settings() -> AsyncGenerator[Settings, None]:
 @pytest.fixture()
 async def admin_db(live_settings: Settings) -> AsyncGenerator[Database, None]:
     db = Database(live_settings)
+    async with db.session_factory() as session:
+        await session.execute(text("DELETE FROM ingestion_jobs"))
+        await session.execute(text("DELETE FROM documents"))
+        await session.execute(text("DELETE FROM org_memberships"))
+        await session.execute(text("DELETE FROM organizations"))
+        await session.execute(text("DELETE FROM api_keys"))
+        await session.execute(text("DELETE FROM refresh_tokens"))
+        await session.execute(text("DELETE FROM users"))
+        await session.commit()
     try:
         yield db
     finally:

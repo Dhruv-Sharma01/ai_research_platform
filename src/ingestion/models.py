@@ -79,10 +79,7 @@ class Chunk(Base):
     )
 
     def __repr__(self) -> str:
-        return (
-            f"<Chunk id={self.id} doc={self.document_id} "
-            f"idx={self.chunk_index}>"
-        )
+        return f"<Chunk id={self.id} doc={self.document_id} idx={self.chunk_index}>"
 
 
 class IngestionJob(Base):
@@ -129,35 +126,24 @@ class IngestionJob(Base):
     max_attempts: Mapped[int] = mapped_column(
         Integer, default=3, server_default=text("3")
     )
-    version: Mapped[int] = mapped_column(
-        Integer, default=1, server_default=text("1")
-    )
+    version: Mapped[int] = mapped_column(Integer, default=1, server_default=text("1"))
     error_message: Mapped[str | None] = mapped_column(Text)
-    claimed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
-    started_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
-    completed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")
     )
 
     # ── Relationships ────────────────────────────────────────
-    document: Mapped[Document] = relationship(
-        back_populates="ingestion_jobs"
-    )
+    document: Mapped[Document] = relationship(back_populates="ingestion_jobs")
 
     __table_args__ = (
         UniqueConstraint(
             "tenant_id", "idempotency_key", name="uq_jobs_tenant_idempotency"
         ),
         CheckConstraint(
-            "status IN ('queued', 'claimed', 'running', "
-            "'completed', 'failed', 'dead')",
+            "status IN ('queued', 'claimed', 'running', 'completed', 'failed', 'dead')",
             name="ck_jobs_status_valid",
         ),
         Index(

@@ -26,9 +26,7 @@ class NotFoundError(AppError):
     status_code = 404
 
     def __init__(self, resource: str, identifier: str) -> None:
-        super().__init__(
-            f"{resource} with identifier '{identifier}' not found."
-        )
+        super().__init__(f"{resource} with identifier '{identifier}' not found.")
 
 
 class ConflictError(AppError):
@@ -47,9 +45,7 @@ class AuthenticationError(AppError):
     code = "AUTHENTICATION_FAILED"
     status_code = 401
 
-    def __init__(
-        self, message: str = "Invalid or expired credentials."
-    ) -> None:
+    def __init__(self, message: str = "Invalid or expired credentials.") -> None:
         super().__init__(message)
 
 
@@ -69,9 +65,7 @@ class RateLimitError(AppError):
     code = "RATE_LIMITED"
     status_code = 429
 
-    def __init__(
-        self, message: str = "Rate limit exceeded. Try again later."
-    ) -> None:
+    def __init__(self, message: str = "Rate limit exceeded. Try again later.") -> None:
         super().__init__(message)
 
 

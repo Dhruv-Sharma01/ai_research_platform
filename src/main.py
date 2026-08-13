@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+import prometheus_client
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -17,6 +18,7 @@ from src.core.config import Settings, get_settings
 from src.core.database import Database
 from src.core.exceptions import AppError
 from src.core.logging import configure_logging, get_logger
+from src.core.rate_limit import close_rate_limiter, init_rate_limiter
 
 logger = get_logger(__name__)
 
@@ -41,8 +43,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         version=settings.app_version,
         env=settings.app_env,
     )
+    # Initialize database engine
+    engine = db.engine
+
+    # Initialize redis rate limiter
+    init_rate_limiter(settings.redis_url)
+
     yield
 
+    # Cleanup resources on shutdown
+    await close_rate_limiter()
     await db.dispose()
     logger.info("app_stopped")
 
@@ -65,6 +75,9 @@ def create_app() -> FastAPI:
     _register_health_routes(app)
     _register_api_routers(app, settings)
 
+    # Internal metrics endpoint
+    app.mount("/metrics", prometheus_client.make_asgi_app())
+
     return app
 
 
@@ -72,6 +85,8 @@ def create_app() -> FastAPI:
 
 
 def _register_middleware(app: FastAPI, settings: Settings) -> None:
+    from src.observability.middleware import PrometheusMiddleware
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -79,6 +94,8 @@ def _register_middleware(app: FastAPI, settings: Settings) -> None:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    # Added last means it is outermost in Starlette
+    app.add_middleware(PrometheusMiddleware)
 
 
 # ── Error Handlers ──────────────────────────────────────────
@@ -86,9 +103,7 @@ def _register_middleware(app: FastAPI, settings: Settings) -> None:
 
 def _register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
-    async def handle_app_error(
-        request: Request, exc: AppError
-    ) -> JSONResponse:
+    async def handle_app_error(request: Request, exc: AppError) -> JSONResponse:
         logger.warning(
             "app_error",
             code=exc.code,
@@ -107,9 +122,7 @@ def _register_error_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(Exception)
-    async def handle_unexpected_error(
-        request: Request, exc: Exception
-    ) -> JSONResponse:
+    async def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
         logger.exception(
             "unhandled_exception",
             path=str(request.url),
@@ -143,9 +156,7 @@ def _register_health_routes(app: FastAPI) -> None:
 
         try:
             async with db.session_factory() as session:
-                await session.execute(
-                    __import__("sqlalchemy").text("SELECT 1")
-                )
+                await session.execute(__import__("sqlalchemy").text("SELECT 1"))
             checks["database"] = "ok"
         except Exception as exc:
             checks["database"] = f"error: {exc}"

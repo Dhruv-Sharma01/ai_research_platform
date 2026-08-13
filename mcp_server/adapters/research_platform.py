@@ -246,9 +246,7 @@ class ResearchPlatformMCPAdapter:
         tenant_id: str | None,
         session: AsyncSession,
     ) -> uuid.UUID:
-        requested_tenant_id = (
-            _parse_uuid(tenant_id, "tenant_id") if tenant_id else None
-        )
+        requested_tenant_id = _parse_uuid(tenant_id, "tenant_id") if tenant_id else None
         membership = await tenant_service.resolve_membership(
             user_id=user_id,
             org_id=requested_tenant_id,

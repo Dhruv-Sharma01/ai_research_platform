@@ -133,6 +133,8 @@ async def evaluate_relevance(
         "relevance_evaluated",
         query_length=len(query),
         chunk_count=len(evaluations),
-        grades={g.value: sum(1 for e in evaluations if e.grade == g) for g in RelevanceGrade},
+        grades={
+            g.value: sum(1 for e in evaluations if e.grade == g) for g in RelevanceGrade
+        },
     )
     return evaluations

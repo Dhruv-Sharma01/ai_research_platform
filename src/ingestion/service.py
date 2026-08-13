@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.config import get_settings
 from src.core.logging import get_logger
 from src.documents.models import Document
 from src.ingestion.models import Chunk, IngestionJob
@@ -33,7 +34,9 @@ async def claim_next_job(
         The claimed IngestionJob, or None if the queue is empty.
     """
     # First, reset stale claims
-    stale_cutoff = datetime.now(UTC) - timedelta(minutes=10)
+    stale_cutoff = datetime.now(UTC) - timedelta(
+        minutes=get_settings().worker_stale_claim_timeout_minutes
+    )
     await db.execute(
         update(IngestionJob)
         .where(
@@ -176,9 +179,7 @@ async def fail_job(
     - ``failed``: can be retried (attempt_count < max_attempts)
     - ``dead``: no more retries
     """
-    final_status = (
-        "dead" if attempt_count >= max_attempts else "failed"
-    )
+    final_status = "dead" if attempt_count >= max_attempts else "failed"
 
     # Reset to queued if retryable, otherwise mark as dead
     if final_status == "dead":
@@ -251,3 +252,40 @@ async def list_jobs_for_document(
         .order_by(IngestionJob.created_at.desc())
     )
     return list(result.scalars().all())
+
+
+async def list_jobs(
+    user_id: uuid.UUID,
+    tenant_id: uuid.UUID,
+    db: AsyncSession,
+    cursor: str | None = None,
+    limit: int = 20,
+) -> tuple[list[IngestionJob], str | None]:
+    """List all ingestion jobs for a tenant with cursor pagination.
+
+    Returns:
+        Tuple of (jobs, next_cursor).
+    """
+    from src.core.pagination import decode_cursor, encode_cursor
+
+    query = (
+        select(IngestionJob)
+        .where(IngestionJob.tenant_id == tenant_id)
+        .order_by(IngestionJob.created_at.desc())
+        .limit(limit + 1)
+    )
+
+    if cursor:
+        cursor_data = decode_cursor(cursor)
+        query = query.where(IngestionJob.created_at < cursor_data["created_at"])
+
+    result = await db.execute(query)
+    jobs = list(result.scalars().all())
+
+    next_cursor = None
+    if len(jobs) > limit:
+        jobs = jobs[:limit]
+        last = jobs[-1]
+        next_cursor = encode_cursor({"created_at": last.created_at.isoformat()})
+
+    return jobs, next_cursor

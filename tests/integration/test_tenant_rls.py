@@ -208,9 +208,7 @@ async def test_rls_hides_rows_without_matching_tenant_context(
                 )
             )
             await conn.execute(text("GRANT USAGE ON SCHEMA public TO app_rls_test"))
-            await conn.execute(
-                text("GRANT SELECT ON documents TO app_rls_test")
-            )
+            await conn.execute(text("GRANT SELECT ON documents TO app_rls_test"))
             await conn.execute(
                 text(
                     """
@@ -305,9 +303,7 @@ async def test_worker_mode_can_claim_jobs_across_tenants(
 ) -> None:
     async with admin_db.session_factory() as session:
         await session.execute(text("SELECT set_config('app.worker_mode', 'on', true)"))
-        result = await session.execute(
-            text("SELECT count(*) FROM ingestion_jobs")
-        )
+        result = await session.execute(text("SELECT count(*) FROM ingestion_jobs"))
 
     assert result.scalar_one() >= 0
 

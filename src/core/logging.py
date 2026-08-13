@@ -34,13 +34,9 @@ def configure_logging(
     ]
 
     if json_format:
-        renderer: structlog.types.Processor = (
-            structlog.processors.JSONRenderer()
-        )
+        renderer: structlog.types.Processor = structlog.processors.JSONRenderer()
     else:
-        renderer = structlog.dev.ConsoleRenderer(
-            colors=sys.stderr.isatty()
-        )
+        renderer = structlog.dev.ConsoleRenderer(colors=sys.stderr.isatty())
 
     structlog.configure(
         processors=[
@@ -84,4 +80,4 @@ def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
         logger = get_logger(__name__)
         logger.info("event_name", key="value")
     """
-    return structlog.get_logger(name)
+    return structlog.get_logger(name)  # type: ignore[no-any-return]

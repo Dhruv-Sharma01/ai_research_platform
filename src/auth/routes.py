@@ -79,18 +79,14 @@ async def get_me(
     return UserResponse.model_validate(user)
 
 
-@router.post(
-    "/api-keys", response_model=ApiKeyCreatedResponse, status_code=201
-)
+@router.post("/api-keys", response_model=ApiKeyCreatedResponse, status_code=201)
 async def create_api_key(
     body: CreateApiKeyRequest,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> ApiKeyCreatedResponse:
     """Create a new API key. The full key is shown only once."""
-    full_key, api_key = await auth_service.create_user_api_key(
-        user.id, body.name, db
-    )
+    full_key, api_key = await auth_service.create_user_api_key(user.id, body.name, db)
     return ApiKeyCreatedResponse(
         key=full_key,
         id=api_key.id,

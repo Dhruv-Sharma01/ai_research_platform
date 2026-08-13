@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     minio_bucket_name: str = "research-documents"
     minio_secure: bool = False
 
+    # ── Redis ─────────────────────────────────────────────────
+    redis_url: str = "redis://localhost:6379/0"
+    rate_limit_requests: int = 100
+    rate_limit_window_seconds: int = 60
+
     # ── Authentication ────────────────────────────────────────
     jwt_secret_key: str = "change-me-to-a-random-256-bit-hex-string"
     jwt_algorithm: str = "HS256"
@@ -72,7 +77,6 @@ class Settings(BaseSettings):
     chunking_semantic_threshold_percentile: float = 60.0
     chunking_semantic_buffer_size: int = 1
 
-
     # ── Ingestion Worker ──────────────────────────────────────
     worker_poll_interval_seconds: float = 1.0
     worker_max_concurrent_jobs: int = 2
@@ -84,9 +88,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
     log_level: str = "INFO"
     api_prefix: str = "/api/v1"
-    cors_origins: list[str] = Field(
-        default_factory=lambda: ["http://localhost:3000"]
-    )
+    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
 
     @property
     def is_production(self) -> bool:
