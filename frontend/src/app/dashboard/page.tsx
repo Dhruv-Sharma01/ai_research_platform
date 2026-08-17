@@ -18,7 +18,10 @@ export default function DashboardPage() {
       <div className="page-container animate-fade-in text-center" style={{ marginTop: '5rem' }}>
         <h2>Welcome to AI Research</h2>
         <p className="text-secondary" style={{ marginBottom: '2rem' }}>You aren't a member of any organization yet.</p>
-        <button className="btn btn-primary" onClick={() => router.push('/invites')}>Check Invitations</button>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
+          <button className="btn btn-primary" onClick={() => router.push('/organizations/create')}>Create New Organization</button>
+          <button className="btn btn-secondary" onClick={() => router.push('/invites')}>Check Invitations</button>
+        </div>
       </div>
     );
   }
