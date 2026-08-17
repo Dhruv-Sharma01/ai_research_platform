@@ -57,8 +57,17 @@ class ObjectStorage:
             except ClientError as exc:
                 code = exc.response["Error"].get("Code", "")
                 if code in ("404", "NoSuchBucket"):
-                    self._client.create_bucket(Bucket=self._bucket)
-                    logger.info("bucket_created", bucket=self._bucket)
+                    try:
+                        self._client.create_bucket(Bucket=self._bucket)
+                        logger.info("bucket_created", bucket=self._bucket)
+                    except ClientError as create_exc:
+                        create_code = create_exc.response["Error"].get("Code", "")
+                        if create_code not in (
+                            "BucketAlreadyOwnedByYou",
+                            "BucketAlreadyExists",
+                        ):
+                            raise
+                        logger.info("bucket_already_exists", bucket=self._bucket)
                 else:
                     raise
 

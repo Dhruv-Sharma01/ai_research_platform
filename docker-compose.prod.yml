@@ -26,7 +26,7 @@ services:
     volumes:
       - minio_data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "mc", "ready", "local"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -47,10 +47,13 @@ services:
       - internal
 
   api-1:
-    build: .
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
     command: uvicorn src.main:app --host 0.0.0.0 --port 8000
     env_file: .env
     environment:
+      - PYTHONPATH=/app
       - APP_ENV=production
       - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/research_platform
       - MINIO_ENDPOINT=http://minio:9000
@@ -71,10 +74,13 @@ services:
       - internal
 
   api-2:
-    build: .
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
     command: uvicorn src.main:app --host 0.0.0.0 --port 8000
     env_file: .env
     environment:
+      - PYTHONPATH=/app
       - APP_ENV=production
       - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/research_platform
       - MINIO_ENDPOINT=http://minio:9000
@@ -95,10 +101,13 @@ services:
       - internal
 
   worker-1:
-    build: .
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
     command: python -m src.ingestion.worker
     env_file: .env
     environment:
+      - PYTHONPATH=/app
       - APP_ENV=production
       - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/research_platform
       - MINIO_ENDPOINT=http://minio:9000
@@ -112,10 +121,13 @@ services:
       - internal
 
   worker-2:
-    build: .
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
     command: python -m src.ingestion.worker
     env_file: .env
     environment:
+      - PYTHONPATH=/app
       - APP_ENV=production
       - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/research_platform
       - MINIO_ENDPOINT=http://minio:9000
@@ -124,6 +136,21 @@ services:
       postgres:
         condition: service_healthy
       minio:
+        condition: service_healthy
+    networks:
+      - internal
+
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      api-1:
+        condition: service_healthy
+      api-2:
         condition: service_healthy
     networks:
       - internal
@@ -139,6 +166,8 @@ services:
         condition: service_healthy
       api-2:
         condition: service_healthy
+      frontend:
+        condition: service_started
     networks:
       - internal
 

@@ -28,6 +28,13 @@ from src.ingestion.pipeline import (
 )
 from src.tenants.middleware import set_tenant_context, set_worker_context
 
+# Import ORM models so SQLAlchemy registers all relationships
+# before mapper configuration occurs in the standalone worker.
+from src.auth.models import User
+from src.documents.models import Document
+from src.ingestion.models import Chunk, IngestionJob
+from src.tenants.models import Organization
+
 logger = get_logger(__name__)
 
 
@@ -67,8 +74,6 @@ async def process_single_job(
                 return
 
             # Load document metadata
-            from src.documents.models import Document
-
             doc = await session.get(Document, _doc_id)
             if doc is None or doc.storage_key is None:
                 raise ValueError(f"Document {_doc_id} not found or has no storage key.")
