@@ -167,6 +167,9 @@ async def create_invite(
     db.add(invite)
     await db.flush()
 
+    # Eagerly load the organization relationship for the response serializer
+    await db.refresh(invite, attribute_names=["organization"])
+
     # In a real system, you would email `raw_token` to the user here.
     return invite
 
@@ -234,5 +237,9 @@ async def accept_invite(
     invite.accepted_at = datetime.now(UTC)
     
     await db.flush()
+
+    # Eagerly load the organization relationship for the response serializer
+    await db.refresh(membership, attribute_names=["organization"])
+
     return membership
 
