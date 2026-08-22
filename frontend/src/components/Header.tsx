@@ -45,7 +45,13 @@ export function Header() {
         {memberships.length > 0 && (
           <select 
             value={activeTenant?.org_id || ''}
-            onChange={(e) => switchTenant(e.target.value)}
+            onChange={(e) => {
+              if (e.target.value === 'create_new_org') {
+                router.push('/organizations/create');
+              } else {
+                switchTenant(e.target.value);
+              }
+            }}
             className="input"
             style={{ width: 'auto', padding: '0.5rem' }}
           >
@@ -54,6 +60,8 @@ export function Header() {
                 {m.organization.name} ({m.role})
               </option>
             ))}
+            <option disabled>──────────</option>
+            <option value="create_new_org">+ Create Organization</option>
           </select>
         )}
       </div>
