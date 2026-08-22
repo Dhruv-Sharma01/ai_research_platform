@@ -110,7 +110,7 @@ class RecursiveTextChunker:
 
     _SEPARATORS = ["\n\n", "\n", ". ", " ", ""]
 
-    def __init__(self, chunk_size: int = 512, chunk_overlap: int = 50) -> None:
+    def __init__(self, chunk_size: int = 2048, chunk_overlap: int = 256) -> None:
         if chunk_overlap >= chunk_size:
             raise ValueError("chunk_overlap must be less than chunk_size.")
         self._chunk_size = chunk_size
@@ -198,7 +198,7 @@ class SemanticTextChunker:
         self,
         embedder: Embedder,
         threshold_percentile: float = 60.0,
-        max_chunk_size: int = 512,
+        max_chunk_size: int = 2048,
         buffer_size: int = 1,
     ) -> None:
         self._embedder = embedder

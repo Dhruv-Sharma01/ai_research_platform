@@ -141,11 +141,11 @@ async def run_worker(settings: Settings | None = None) -> None:
         chunker: RecursiveTextChunker | SemanticTextChunker = SemanticTextChunker(
             embedder=embedder,
             threshold_percentile=settings.chunking_semantic_threshold_percentile,
-            max_chunk_size=512,
+            max_chunk_size=2048,
             buffer_size=settings.chunking_semantic_buffer_size,
         )
     else:
-        chunker = RecursiveTextChunker(chunk_size=512, chunk_overlap=50)
+        chunker = RecursiveTextChunker(chunk_size=2048, chunk_overlap=256)
     pipeline = IngestionPipeline(embedder, chunker)
 
     worker_id = f"{socket.gethostname()}-{os.getpid()}"
