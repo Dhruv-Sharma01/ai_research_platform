@@ -30,7 +30,8 @@ export default function LoginPage() {
       if (res.refresh_token) {
         localStorage.setItem('refresh_token', res.refresh_token);
       }
-      router.push('/dashboard');
+      // Use window.location to ensure TenantProvider re-initializes with the new token
+      window.location.href = '/dashboard';
     } catch (err: any) {
       setError(err.message || 'Login failed');
     } finally {

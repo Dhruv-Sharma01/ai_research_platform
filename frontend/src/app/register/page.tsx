@@ -21,17 +21,24 @@ export default function RegisterPage() {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
-      // If successful, log them in immediately
+
+      // Auto-login after successful registration
+      // The login endpoint expects JSON with email/password fields
+      const form = new FormData();
+      form.append('username', email);
+      form.append('password', password);
+
       const res = await fetchApi('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: form,
       });
 
       localStorage.setItem('access_token', res.access_token);
       if (res.refresh_token) {
         localStorage.setItem('refresh_token', res.refresh_token);
       }
-      router.push('/dashboard');
+      // Use window.location to ensure TenantProvider re-initializes
+      window.location.href = '/dashboard';
     } catch (err: any) {
       setError(err.message || 'Registration failed');
     } finally {

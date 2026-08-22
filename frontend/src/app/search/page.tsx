@@ -3,13 +3,26 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchApi } from '@/lib/api';
+import { useTenant } from '@/components/TenantProvider';
 
 export default function SearchPage() {
   const router = useRouter();
+  const { activeTenant } = useTenant();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [hasSearched, setHasSearched] = useState(false);
+
+  if (!activeTenant) {
+    return (
+      <div className="page-container animate-fade-in text-center" style={{ marginTop: '5rem' }}>
+        <h2>No Organization Selected</h2>
+        <p className="text-secondary" style={{ marginBottom: '2rem' }}>You need to join or create an organization before searching.</p>
+        <button className="btn btn-primary" onClick={() => router.push('/dashboard')}>Go to Dashboard</button>
+      </div>
+    );
+  }
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,9 +30,9 @@ export default function SearchPage() {
 
     setError('');
     setLoading(true);
+    setHasSearched(true);
 
     try {
-      // Execute a hybrid search by default
       const res = await fetchApi('/search', {
         method: 'POST',
         body: JSON.stringify({ query, top_k: 5 }),
@@ -88,7 +101,7 @@ export default function SearchPage() {
           </div>
         ))}
 
-        {!loading && results.length === 0 && query && !error && (
+        {!loading && results.length === 0 && hasSearched && !error && (
           <p className="text-secondary text-center">No results found for "{query}".</p>
         )}
       </div>

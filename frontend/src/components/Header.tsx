@@ -1,18 +1,25 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useTenant } from './TenantProvider';
 import { fetchApi } from '@/lib/api';
 
+// Pages where the header should NOT appear
+const PUBLIC_PATHS = ['/login', '/register', '/'];
+
 export function Header() {
   const router = useRouter();
+  const pathname = usePathname();
   const { memberships, activeTenant, switchTenant, isLoading } = useTenant();
   const [pendingInvitesCount, setPendingInvitesCount] = useState(0);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    // Fetch pending invites if authenticated
-    if (localStorage.getItem('access_token')) {
+    const hasToken = !!localStorage.getItem('access_token');
+    setIsAuthenticated(hasToken);
+
+    if (hasToken) {
       fetchApi('/organizations/invites/pending')
         .then((invites: any[]) => setPendingInvitesCount(invites.length))
         .catch(console.error);
@@ -25,7 +32,10 @@ export function Header() {
     window.location.href = '/login';
   };
 
+  // Don't render header on public pages or while loading
   if (isLoading) return null;
+  if (!isAuthenticated) return null;
+  if (PUBLIC_PATHS.includes(pathname)) return null;
 
   return (
     <header className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem 2rem', marginBottom: '2rem', borderRadius: 0, borderTop: 0, borderLeft: 0, borderRight: 0 }}>
