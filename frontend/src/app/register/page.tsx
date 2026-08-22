@@ -23,14 +23,9 @@ export default function RegisterPage() {
       });
 
       // Auto-login after successful registration
-      // The login endpoint expects JSON with email/password fields
-      const form = new FormData();
-      form.append('username', email);
-      form.append('password', password);
-
       const res = await fetchApi('/auth/login', {
         method: 'POST',
-        body: form,
+        body: JSON.stringify({ email, password }),
       });
 
       localStorage.setItem('access_token', res.access_token);
