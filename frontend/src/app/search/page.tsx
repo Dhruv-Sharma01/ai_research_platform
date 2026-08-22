@@ -54,18 +54,18 @@ export default function SearchPage() {
         </button>
         <h1 className="text-center" style={{ fontSize: '3rem', marginBottom: '2rem' }}>Hybrid Search</h1>
         
-        <form onSubmit={handleSearch} className="flex gap-2 relative">
+        <form onSubmit={handleSearch} style={{ display: 'flex', gap: '0.75rem', position: 'relative' }}>
           <input 
             type="text" 
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Ask a question or search keywords..."
             style={{ 
-              padding: '1.2rem 2rem', 
-              fontSize: '1.2rem', 
-              borderRadius: '50px',
+              flex: 1,
+              padding: '0.9rem 1.5rem', 
+              fontSize: '1rem', 
+              borderRadius: '12px',
               backgroundColor: 'var(--bg-tertiary)',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
               border: '1px solid var(--glass-border)'
             }}
           />
@@ -74,12 +74,9 @@ export default function SearchPage() {
             className="btn btn-primary"
             disabled={loading || !query.trim()}
             style={{ 
-              position: 'absolute', 
-              right: '8px', 
-              top: '8px', 
-              bottom: '8px', 
-              borderRadius: '40px',
-              padding: '0 2rem'
+              borderRadius: '12px',
+              padding: '0.9rem 1.5rem',
+              whiteSpace: 'nowrap',
             }}
           >
             {loading ? 'Searching...' : 'Search'}
