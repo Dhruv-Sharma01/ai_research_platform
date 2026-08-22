@@ -37,6 +37,18 @@ class MembershipResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class OrgMemberResponse(BaseModel):
+    """A member of an organization, including their email."""
+
+    id: uuid.UUID
+    user_id: uuid.UUID
+    role: str
+    email: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class TenantContext(BaseModel):
     """Resolved tenant for the current request."""
 

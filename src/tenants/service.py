@@ -113,6 +113,33 @@ def require_role(role: str, allowed: set[str]) -> None:
         raise AuthorizationError("Insufficient organization role.")
 
 
+async def list_org_members(
+    *,
+    org_id: uuid.UUID,
+    db: AsyncSession,
+) -> list[dict]:
+    """List all members of an organization with their email addresses."""
+    from src.auth.models import User
+
+    result = await db.execute(
+        select(OrgMembership)
+        .where(OrgMembership.org_id == org_id)
+        .options(selectinload(OrgMembership.user))
+        .order_by(OrgMembership.created_at.asc())
+    )
+    memberships = result.scalars().all()
+    return [
+        {
+            "id": m.id,
+            "user_id": m.user_id,
+            "role": m.role,
+            "email": m.user.email,
+            "created_at": m.created_at,
+        }
+        for m in memberships
+    ]
+
+
 async def create_invite(
     *,
     org_id: uuid.UUID,

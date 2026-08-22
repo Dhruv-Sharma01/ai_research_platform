@@ -12,6 +12,7 @@ from src.auth.models import User
 from src.tenants import service as tenant_service
 from src.tenants.schemas import (
     MembershipResponse,
+    OrgMemberResponse,
     OrganizationCreateRequest,
     OrganizationResponse,
     OrganizationInviteCreateRequest,
@@ -47,6 +48,17 @@ async def list_organizations(
     """List organizations available to the current user."""
     memberships = await tenant_service.list_memberships(user_id=user.id, db=db)
     return [MembershipResponse.model_validate(item) for item in memberships]
+
+
+@router.get("/members", response_model=list[OrgMemberResponse])
+async def list_members(
+    user: User = Depends(get_current_user),
+    tenant: TenantContext = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[OrgMemberResponse]:
+    """List all members of the current organization."""
+    members = await tenant_service.list_org_members(org_id=tenant.org_id, db=db)
+    return [OrgMemberResponse.model_validate(m) for m in members]
 
 
 @router.post("/invites", response_model=OrganizationInviteResponse, status_code=201)
