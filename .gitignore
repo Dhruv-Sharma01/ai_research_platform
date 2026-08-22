@@ -47,3 +47,5 @@ desktop.ini
 storage/
 data/
 *.sqlite3
+docker-compose.prod.yml.backup.*
+docker/nginx/nginx.conf.backup.*
