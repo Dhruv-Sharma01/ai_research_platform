@@ -23,22 +23,6 @@ export default function DashboardPage() {
   const { activeTenant } = useTenant();
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // If no tenant is selected, show onboarding
-  if (!activeTenant) {
-    return (
-      <div className="page-container animate-fade-in text-center" style={{ marginTop: '5rem' }}>
-        <h2>Welcome to AI Research</h2>
-        <p className="text-secondary" style={{ marginBottom: '2rem' }}>You aren't a member of any organization yet.</p>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
-          <button className="btn btn-primary" onClick={() => router.push('/organizations/create')}>Create New Organization</button>
-          <button className="btn btn-secondary" onClick={() => router.push('/invites')}>Check Invitations</button>
-        </div>
-      </div>
-    );
-  }
-
-  const role = activeTenant.role;
-
   const loadDocuments = useCallback(async () => {
     try {
       const data = await fetchApi('/documents');
@@ -52,24 +36,7 @@ export default function DashboardPage() {
     }
   }, []);
 
-  // Initial load + set up polling for in-progress documents
-  useEffect(() => {
-    if (!activeTenant) return;
-
-    loadDocuments().then((docs: DocumentItem[]) => {
-      startPollingIfNeeded(docs);
-    });
-
-    return () => {
-      if (pollTimerRef.current) {
-        clearInterval(pollTimerRef.current);
-        pollTimerRef.current = null;
-      }
-    };
-  }, [activeTenant, loadDocuments]);
-
-  const startPollingIfNeeded = (docs: DocumentItem[]) => {
-    // Clear any existing poll
+  const startPollingIfNeeded = useCallback((docs: DocumentItem[]) => {
     if (pollTimerRef.current) {
       clearInterval(pollTimerRef.current);
       pollTimerRef.current = null;
@@ -86,7 +53,38 @@ export default function DashboardPage() {
         }
       }, 3000);
     }
-  };
+  }, [loadDocuments]);
+
+  useEffect(() => {
+    if (!activeTenant) return;
+
+    loadDocuments().then((docs: DocumentItem[]) => {
+      startPollingIfNeeded(docs);
+    });
+
+    return () => {
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+    };
+  }, [activeTenant, loadDocuments, startPollingIfNeeded]);
+
+  // If no tenant is selected, show onboarding
+  if (!activeTenant) {
+    return (
+      <div className="page-container animate-fade-in text-center" style={{ marginTop: '5rem' }}>
+        <h2>Welcome to AI Research</h2>
+        <p className="text-secondary" style={{ marginBottom: '2rem' }}>You aren't a member of any organization yet.</p>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
+          <button className="btn btn-primary" onClick={() => router.push('/organizations/create')}>Create New Organization</button>
+          <button className="btn btn-secondary" onClick={() => router.push('/invites')}>Check Invitations</button>
+        </div>
+      </div>
+    );
+  }
+
+  const role = activeTenant.role;
 
   const deleteDocument = async (id: string) => {
     if (!confirm('Are you sure you want to delete this document?')) return;
@@ -182,9 +180,10 @@ export default function DashboardPage() {
                   }}>
                     <div style={{
                       height: '100%',
+                      width: '40%',
                       borderRadius: '3px',
-                      background: 'linear-gradient(90deg, var(--accent-primary), var(--accent-secondary, #8b5cf6))',
-                      animation: 'progress-indeterminate 1.5s ease-in-out infinite',
+                      background: 'linear-gradient(90deg, var(--accent-primary), #8b5cf6)',
+                      animation: 'progress-slide 1.5s ease-in-out infinite alternate',
                     }} />
                   </div>
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.4rem' }}>
@@ -208,10 +207,9 @@ export default function DashboardPage() {
       )}
 
       <style jsx>{`
-        @keyframes progress-indeterminate {
-          0% { width: 0%; margin-left: 0%; }
-          50% { width: 60%; margin-left: 20%; }
-          100% { width: 0%; margin-left: 100%; }
+        @keyframes progress-slide {
+          0% { margin-left: 0%; }
+          100% { margin-left: 60%; }
         }
       `}</style>
     </div>
