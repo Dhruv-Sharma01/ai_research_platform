@@ -140,6 +140,32 @@ async def list_org_members(
     ]
 
 
+async def remove_member(
+    *,
+    org_id: uuid.UUID,
+    user_id_to_remove: uuid.UUID,
+    current_user_id: uuid.UUID,
+    db: AsyncSession,
+) -> None:
+    """Remove a member from an organization."""
+    if user_id_to_remove == current_user_id:
+        raise ConflictError("You cannot remove yourself from the organization.")
+
+    result = await db.execute(
+        select(OrgMembership).where(
+            OrgMembership.org_id == org_id,
+            OrgMembership.user_id == user_id_to_remove,
+        )
+    )
+    membership = result.scalar_one_or_none()
+
+    if not membership:
+        raise NotFoundError("Organization membership", str(user_id_to_remove))
+
+    await db.delete(membership)
+    await db.flush()
+
+
 async def create_invite(
     *,
     org_id: uuid.UUID,

@@ -64,6 +64,19 @@ export default function TeamSettingsPage() {
     }
   };
 
+  const handleRemoveMember = async (userId: string) => {
+    if (!confirm('Are you sure you want to remove this member?')) return;
+    try {
+      await fetchApi(`/organizations/members/${userId}`, {
+        method: 'DELETE',
+      });
+      alert('Member removed successfully!');
+      loadMembers();
+    } catch (err: any) {
+      alert(err.message || 'Failed to remove member');
+    }
+  };
+
   if (!activeTenant || !canManageTeam(activeTenant.role)) return null;
 
   const getRoleBadgeColor = (role: string) => {
@@ -112,20 +125,31 @@ export default function TeamSettingsPage() {
                 <div>
                   <span style={{ fontWeight: 500 }}>{member.email}</span>
                 </div>
-                <span
-                  style={{
-                    padding: '0.25rem 0.75rem',
-                    borderRadius: '20px',
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
-                    textTransform: 'capitalize',
-                    backgroundColor: getRoleBadgeColor(member.role) + '22',
-                    color: getRoleBadgeColor(member.role),
-                    border: `1px solid ${getRoleBadgeColor(member.role)}44`,
-                  }}
-                >
-                  {member.role}
-                </span>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                  <span
+                    style={{
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '20px',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      textTransform: 'capitalize',
+                      backgroundColor: getRoleBadgeColor(member.role) + '22',
+                      color: getRoleBadgeColor(member.role),
+                      border: `1px solid ${getRoleBadgeColor(member.role)}44`,
+                    }}
+                  >
+                    {member.role}
+                  </span>
+                  {member.user_id !== activeTenant.user_id && (
+                    <button
+                      className="btn btn-secondary"
+                      style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', borderColor: 'var(--danger)', color: 'var(--danger)' }}
+                      onClick={() => handleRemoveMember(member.user_id)}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>

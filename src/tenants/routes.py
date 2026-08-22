@@ -60,6 +60,22 @@ async def list_members(
     members = await tenant_service.list_org_members(org_id=tenant.org_id, db=db)
     return [OrgMemberResponse.model_validate(m) for m in members]
 
+@router.delete("/members/{user_id_to_remove}", status_code=204)
+async def remove_member(
+    user_id_to_remove: uuid.UUID,
+    user: User = Depends(get_current_user),
+    tenant: TenantContext = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> None:
+    """Remove a member from the current organization."""
+    tenant_service.require_role(tenant.role, {"admin"})
+    await tenant_service.remove_member(
+        org_id=tenant.org_id,
+        user_id_to_remove=user_id_to_remove,
+        current_user_id=user.id,
+        db=db,
+    )
+
 
 @router.post("/invites", response_model=OrganizationInviteResponse, status_code=201)
 async def create_invite(
