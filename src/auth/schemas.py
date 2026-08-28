@@ -14,15 +14,10 @@ _EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 # ── Requests ─────────────────────────────────────────────────
 
 
-    """User login payload."""
+class GoogleLoginRequest(BaseModel):
+    """Request schema for Google OAuth login."""
 
-    email: str = Field(max_length=255)
-    password: str
-
-    @field_validator("email")
-    @classmethod
-    def normalize_email(cls, v: str) -> str:
-        return v.lower().strip()
+    credential: str
 
 
 class RefreshRequest(BaseModel):
