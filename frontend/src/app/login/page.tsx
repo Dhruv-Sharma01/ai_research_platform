@@ -3,23 +3,21 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchApi } from '@/lib/api';
+import { GoogleLogin } from '@react-oauth/google';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGoogleSuccess = async (credentialResponse: any) => {
     setError('');
     setLoading(true);
 
     try {
-      const res = await fetchApi('/auth/login', {
+      const res = await fetchApi('/auth/google-login', {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ credential: credentialResponse.credential }),
       });
 
       localStorage.setItem('access_token', res.access_token);
@@ -29,7 +27,7 @@ export default function LoginPage() {
       // Use window.location to ensure TenantProvider re-initializes with the new token
       window.location.href = '/dashboard';
     } catch (err: any) {
-      setError(err.message || 'Login failed');
+      setError(err.message || 'Google Login failed');
     } finally {
       setLoading(false);
     }
@@ -37,45 +35,27 @@ export default function LoginPage() {
 
   return (
     <div className="page-container flex items-center justify-center animate-fade-in" style={{ minHeight: '100vh' }}>
-      <div className="glass-panel" style={{ padding: '3rem', width: '100%', maxWidth: '400px' }}>
-        <h1 className="text-center" style={{ marginBottom: '0.5rem' }}>Welcome Back</h1>
+      <div className="glass-panel" style={{ padding: '3rem', width: '100%', maxWidth: '400px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <h1 className="text-center" style={{ marginBottom: '0.5rem' }}>Welcome</h1>
         <p className="text-center text-secondary" style={{ marginBottom: '2rem' }}>Sign in to your AI Research Platform</p>
         
         {error && (
-          <div style={{ backgroundColor: 'var(--danger)', color: 'white', padding: '0.75rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.9rem' }}>
+          <div style={{ backgroundColor: 'var(--danger)', color: 'white', padding: '0.75rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.9rem', width: '100%' }}>
             {error}
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="flex flex-col gap-4">
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Email</label>
-            <input 
-              type="email" 
-              value={email} 
-              onChange={(e) => setEmail(e.target.value)} 
-              placeholder="you@example.com" 
-              required 
-            />
-          </div>
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Password</label>
-            <input 
-              type="password" 
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)} 
-              placeholder="••••••••" 
-              required 
-            />
-          </div>
-          <button type="submit" className="btn btn-primary" disabled={loading} style={{ marginTop: '1rem' }}>
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-        </form>
-
-        <p className="text-center" style={{ marginTop: '1.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-          Don't have an account? <a href="/register" className="text-accent" style={{ textDecoration: 'none' }}>Sign up</a>
-        </p>
+        {loading ? (
+          <p className="text-secondary">Signing in...</p>
+        ) : (
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={() => {
+              setError('Google Login was unsuccessful or aborted.');
+            }}
+            useOneTap
+          />
+        )}
       </div>
     </div>
   );

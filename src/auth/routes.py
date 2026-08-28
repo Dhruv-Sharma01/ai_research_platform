@@ -15,9 +15,8 @@ from src.auth.schemas import (
     ApiKeyCreatedResponse,
     ApiKeyResponse,
     CreateApiKeyRequest,
-    LoginRequest,
+    GoogleLoginRequest,
     RefreshRequest,
-    RegisterRequest,
     TokenResponse,
     UserResponse,
 )
@@ -26,25 +25,15 @@ from src.core.config import Settings, get_settings
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/register", response_model=UserResponse, status_code=201)
-async def register(
-    body: RegisterRequest,
-    db: AsyncSession = Depends(get_db_session),
-) -> UserResponse:
-    """Create a new user account."""
-    user = await auth_service.register_user(body.email, body.password, db)
-    return UserResponse.model_validate(user)
-
-
-@router.post("/login", response_model=TokenResponse)
-async def login(
-    body: LoginRequest,
+@router.post("/google-login", response_model=TokenResponse)
+async def google_login(
+    body: GoogleLoginRequest,
     db: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> TokenResponse:
-    """Authenticate and receive access + refresh tokens."""
-    access_token, refresh_token = await auth_service.login_user(
-        body.email, body.password, db, settings
+    """Authenticate and receive access + refresh tokens using a Google id_token."""
+    access_token, refresh_token = await auth_service.google_login(
+        body.credential, db, settings
     )
     return TokenResponse(
         access_token=access_token,

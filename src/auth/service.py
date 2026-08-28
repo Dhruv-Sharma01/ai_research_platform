@@ -26,71 +26,52 @@ from src.core.security import (
     create_access_token,
     generate_api_key,
     generate_refresh_token,
-    hash_password,
     hash_refresh_token,
-    verify_password,
 )
 
 logger = get_logger(__name__)
 
 
-# ── Registration ─────────────────────────────────────────────
+from google.oauth2 import id_token
+from google.auth.transport import requests
 
+# ── Google Login ─────────────────────────────────────────────
 
-async def register_user(
-    email: str,
-    password: str,
-    db: AsyncSession,
-) -> User:
-    """Create a new user account.
-
-    Raises:
-        ConflictError: If a user with this email already exists.
-    """
-    user = User(
-        email=email,
-        password_hash=hash_password(password),
-    )
-    db.add(user)
-
-    try:
-        await db.flush()
-    except IntegrityError:
-        raise ConflictError(f"User with email '{email}' already exists.")
-
-    from src.tenants.service import create_personal_organization
-
-    await create_personal_organization(user_id=user.id, email=user.email, db=db)
-
-    logger.info("user_registered", user_id=str(user.id), email=email)
-    return user
-
-
-# ── Login ────────────────────────────────────────────────────
-
-
-async def login_user(
-    email: str,
-    password: str,
+async def google_login(
+    credential: str,
     db: AsyncSession,
     settings: Settings,
 ) -> tuple[str, str]:
-    """Authenticate a user and return access + refresh tokens.
-
-    Returns:
-        Tuple of (access_token, raw_refresh_token).
-
-    Raises:
-        AuthenticationError: If email or password is wrong, or account
-            is deactivated.
+    """Authenticate a user via Google OAuth id_token.
+    
+    If the user doesn't exist, create them. Returns access + refresh tokens.
     """
+    try:
+        # We need a google-auth Request object. It does blocking I/O for certs,
+        # but the cache usually prevents actual network calls after the first time.
+        request = requests.Request()
+        id_info = id_token.verify_oauth2_token(credential, request)
+        email = id_info.get("email")
+        if not email:
+            raise AuthenticationError("Google token missing email.")
+    except ValueError as exc:
+        logger.warning("google_token_verification_failed", error=str(exc))
+        raise AuthenticationError("Invalid Google token.") from exc
+
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
 
-    # Same error message for wrong email and wrong password
-    # to prevent user enumeration.
-    if user is None or not verify_password(password, user.password_hash):
-        raise AuthenticationError("Invalid email or password.")
+    if user is None:
+        user = User(email=email)
+        db.add(user)
+        try:
+            await db.flush()
+        except IntegrityError as exc:
+            raise ConflictError(f"User with email '{email}' already exists.") from exc
+
+        from src.tenants.service import create_personal_organization
+        await create_personal_organization(user_id=user.id, email=user.email, db=db)
+        logger.info("user_registered_via_google", user_id=str(user.id), email=email)
 
     if not user.is_active:
         raise AuthenticationError("Account is deactivated.")
@@ -106,7 +87,7 @@ async def login_user(
     db.add(refresh)
     await db.flush()
 
-    logger.info("user_logged_in", user_id=str(user.id))
+    logger.info("user_logged_in_via_google", user_id=str(user.id))
     return access_token, raw_refresh
 
 

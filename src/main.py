@@ -179,13 +179,19 @@ def _register_api_routers(app: FastAPI, settings: Settings) -> None:
     from src.ingestion.routes import router as ingestion_router
     from src.retrieval.routes import router as search_router
     from src.tenants.routes import router as tenants_router
+    from src.auth.dependencies import get_current_user
+    from fastapi import Depends
 
+    # Auth router handles its own dependencies internally for /me and /api-keys
     app.include_router(auth_router, prefix=settings.api_prefix)
-    app.include_router(tenants_router, prefix=settings.api_prefix)
-    app.include_router(documents_router, prefix=settings.api_prefix)
-    app.include_router(ingestion_router, prefix=settings.api_prefix)
-    app.include_router(search_router, prefix=settings.api_prefix)
-    app.include_router(evaluation_router, prefix=settings.api_prefix)
+
+    # Globally enforce authentication for all other routers
+    auth_dep = [Depends(get_current_user)]
+    app.include_router(tenants_router, prefix=settings.api_prefix, dependencies=auth_dep)
+    app.include_router(documents_router, prefix=settings.api_prefix, dependencies=auth_dep)
+    app.include_router(ingestion_router, prefix=settings.api_prefix, dependencies=auth_dep)
+    app.include_router(search_router, prefix=settings.api_prefix, dependencies=auth_dep)
+    app.include_router(evaluation_router, prefix=settings.api_prefix, dependencies=auth_dep)
 
 
 # Module-level app instance for `uvicorn src.main:app`

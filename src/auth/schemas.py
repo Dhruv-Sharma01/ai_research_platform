@@ -14,21 +14,6 @@ _EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 # ── Requests ─────────────────────────────────────────────────
 
 
-class RegisterRequest(BaseModel):
-    """User registration payload."""
-
-    email: str = Field(max_length=255)
-    password: str = Field(min_length=8, max_length=128)
-
-    @field_validator("email")
-    @classmethod
-    def validate_email(cls, v: str) -> str:
-        if not _EMAIL_RE.match(v):
-            raise ValueError("Invalid email address.")
-        return v.lower().strip()
-
-
-class LoginRequest(BaseModel):
     """User login payload."""
 
     email: str = Field(max_length=255)

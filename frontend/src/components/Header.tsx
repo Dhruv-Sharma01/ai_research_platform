@@ -6,7 +6,7 @@ import { useTenant } from './TenantProvider';
 import { fetchApi } from '@/lib/api';
 
 // Pages where the header should NOT appear
-const PUBLIC_PATHS = ['/login', '/register', '/'];
+const PUBLIC_PATHS = ['/login', '/'];
 
 export function Header() {
   const router = useRouter();
