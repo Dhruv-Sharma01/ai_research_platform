@@ -3,6 +3,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { fetchApi } from '@/lib/api';
 
+import { usePathname } from 'next/navigation';
+
 export type TenantMembership = {
   org_id: string;
   user_id: string;
@@ -26,6 +28,7 @@ export type TenantContextValue = {
 const TenantContext = createContext<TenantContextValue | undefined>(undefined);
 
 export function TenantProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [memberships, setMemberships] = useState<TenantMembership[]>([]);
   const [activeTenant, setActiveTenant] = useState<TenantMembership | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -54,13 +57,23 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    // Only load if we have a token (user is authenticated)
-    if (localStorage.getItem('access_token')) {
-      loadMemberships();
+    const PUBLIC_PATHS = ['/login', '/'];
+    const token = localStorage.getItem('access_token');
+    
+    // Check auth requirement based on path
+    const isPublic = PUBLIC_PATHS.includes(pathname);
+
+    if (token) {
+      if (memberships.length === 0 && isLoading) {
+        loadMemberships();
+      }
     } else {
       setIsLoading(false);
+      if (!isPublic) {
+        window.location.href = '/login';
+      }
     }
-  }, []);
+  }, [pathname]);
 
   const switchTenant = (tenantId: string) => {
     const tenant = memberships.find(m => m.org_id === tenantId);
