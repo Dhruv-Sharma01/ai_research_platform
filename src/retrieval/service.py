@@ -259,10 +259,20 @@ async def hybrid_search(
         fused_results=len(fused),
     )
 
-    # Fallback to web search if no internal results
-    if not fused:
-        logger.info("hybrid_search_fallback_to_web", query=query)
-        fused = await _fallback_web_search(query, settings, top_k)
+    # CRAG Evaluation: If we have internal chunks, evaluate their relevance
+    is_useful = False
+    if fused:
+        is_useful = await _evaluate_chunks(query, fused, settings)
+        if not is_useful:
+            logger.info("crag_eval_failed_triggering_web_search", query=query)
+
+    # Fallback to web search if no internal results OR if CRAG deemed them useless
+    if not fused or not is_useful:
+        if not fused:
+            logger.info("hybrid_search_fallback_to_web", query=query)
+        web_fused = await _fallback_web_search(query, settings, top_k)
+        if web_fused:
+            fused = web_fused
 
     # Synthesize answer
     answer = None
@@ -270,6 +280,40 @@ async def hybrid_search(
         answer = await _synthesize_answer(query, fused, settings)
 
     return fused, answer
+
+
+async def _evaluate_chunks(query: str, chunks: list[RankedChunk | RankedWebResult], settings: Settings) -> bool:
+    """CRAG evaluation: Determine if retrieved chunks are relevant to the query."""
+    if not settings.groq_api_key:
+        return True  # default to true if no API key to avoid breaking the flow
+
+    client = AsyncGroq(api_key=settings.groq_api_key)
+    context_text = ""
+    for idx, chunk in enumerate(chunks, 1):
+        if isinstance(chunk, RankedChunk):
+            context_text += f"\n[{idx}]: {chunk.content}\n"
+
+    prompt = f"""You are a relevance evaluator for a research platform.
+Query: {query}
+Context:
+{context_text}
+
+Does the context contain any relevant information to help answer the query?
+Reply strictly with exactly "YES" or "NO"."""
+
+    try:
+        completion = await client.chat.completions.create(
+            model=settings.groq_model_name,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=10,
+        )
+        response = completion.choices[0].message.content.strip().upper()
+        # If the model says NO, it's useless. Otherwise, assume useful.
+        return "NO" not in response
+    except Exception as e:
+        logger.error("crag_eval_failed", error=str(e))
+        return True  # fallback to assuming it's good if eval fails
 
 
 def _reciprocal_rank_fusion(
