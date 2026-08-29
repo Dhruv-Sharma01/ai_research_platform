@@ -14,6 +14,8 @@ class SearchRequest(BaseModel):
     top_k: int = Field(default=5, ge=1, le=50)
 
 
+from typing import Literal
+
 class ChunkResult(BaseModel):
     """A single search result chunk."""
 
@@ -24,6 +26,19 @@ class ChunkResult(BaseModel):
     page_number: int | None
     score: float
     document_filename: str
+    source_type: Literal["internal"] = "internal"
+
+    model_config = {"from_attributes": True}
+
+
+class WebResult(BaseModel):
+    """A web search result."""
+
+    url: str
+    title: str
+    content: str
+    score: float
+    source_type: Literal["web"] = "web"
 
     model_config = {"from_attributes": True}
 
@@ -32,5 +47,6 @@ class SearchResponse(BaseModel):
     """Search response with ranked results."""
 
     query: str
-    results: list[ChunkResult]
+    results: list[ChunkResult | WebResult]
     total: int
+    answer: str | None = None

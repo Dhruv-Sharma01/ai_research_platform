@@ -16,7 +16,7 @@ from src.auth.models import User
 from src.core.config import get_settings
 from src.ingestion.pipeline import Embedder, SentenceTransformerEmbedder
 from src.retrieval import service as search_service
-from src.retrieval.schemas import ChunkResult, SearchRequest, SearchResponse
+from src.retrieval.schemas import ChunkResult, WebResult, SearchRequest, SearchResponse
 from src.tenants.dependencies import get_current_tenant
 from src.tenants.schemas import TenantContext
 
@@ -34,8 +34,15 @@ def _get_embedder(request: Request) -> Embedder:
     return request.app.state.embedder
 
 
-def _ranked_to_result(r: search_service.RankedChunk) -> ChunkResult:
-    """Convert a RankedChunk dataclass to a ChunkResult schema."""
+def _ranked_to_result(r: search_service.RankedChunk | search_service.RankedWebResult) -> ChunkResult | WebResult:
+    """Convert a RankedChunk or RankedWebResult dataclass to a schema."""
+    if isinstance(r, search_service.RankedWebResult):
+        return WebResult(
+            url=r.url,
+            title=r.title,
+            content=r.content,
+            score=r.score,
+        )
     return ChunkResult(
         chunk_id=r.chunk_id,
         document_id=r.document_id,
@@ -61,12 +68,13 @@ async def search(
     using Reciprocal Rank Fusion.
     """
     settings = get_settings()
-    results = await search_service.hybrid_search(
+    results, answer = await search_service.hybrid_search(
         query=body.query,
         user_id=user.id,
         tenant_id=tenant.org_id,
         embedder=embedder,
         db=db,
+        settings=settings,
         top_k=body.top_k,
         candidate_multiplier=settings.retrieval_candidate_multiplier,
     )
@@ -75,6 +83,7 @@ async def search(
         query=body.query,
         results=[_ranked_to_result(r) for r in results],
         total=len(results),
+        answer=answer,
     )
 
 

@@ -56,6 +56,8 @@ class Settings(BaseSettings):
     # ── External APIs ─────────────────────────────────────────
     google_api_key: str = ""
     tavily_api_key: str = ""
+    groq_api_key: str = ""
+    groq_model_name: str = "llama-3.1-8b-instant"
 
     # ── LLM Gateway ──────────────────────────────────────────
     llm_model_name: str = "models/gemini-2.0-flash"

@@ -10,6 +10,7 @@ export default function SearchPage() {
   const { activeTenant } = useTenant();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<any[]>([]);
+  const [answer, setAnswer] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
@@ -31,6 +32,8 @@ export default function SearchPage() {
     setError('');
     setLoading(true);
     setHasSearched(true);
+    setAnswer(null);
+    setResults([]);
 
     try {
       const res = await fetchApi('/search', {
@@ -38,6 +41,7 @@ export default function SearchPage() {
         body: JSON.stringify({ query, top_k: 5 }),
       });
       setResults(res.results || []);
+      setAnswer(res.answer || null);
     } catch (err: any) {
       setError(err.message || 'Search failed');
     } finally {
@@ -86,17 +90,47 @@ export default function SearchPage() {
       </div>
 
       <div style={{ width: '100%', maxWidth: '800px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        {results.map((result, idx) => (
-          <div key={idx} className="glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div className="flex justify-between items-center" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
-              <span className="text-accent" style={{ fontWeight: 600 }}>Score: {result.score.toFixed(3)}</span>
-              <span className="text-secondary" style={{ fontSize: '0.9rem' }}>Doc: {result.document_id}</span>
-            </div>
-            <p style={{ lineHeight: 1.6, color: 'var(--text-primary)' }}>
-              {result.content}
+        
+        {loading && (
+          <div className="text-center text-secondary py-8">
+            <p className="animate-pulse">Retrieving sources and generating answer...</p>
+          </div>
+        )}
+
+        {!loading && answer && (
+          <div className="glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', border: '1px solid var(--accent)' }}>
+            <h2 className="text-accent" style={{ fontSize: '1.5rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.5rem' }}>AI Answer</h2>
+            <p style={{ lineHeight: 1.6, color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
+              {answer}
             </p>
           </div>
-        ))}
+        )}
+
+        {!loading && results.length > 0 && (
+          <div>
+            <h3 className="text-secondary" style={{ marginBottom: '1rem', marginTop: '1rem' }}>Sources</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {results.map((result, idx) => (
+                <div key={idx} className="glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div className="flex justify-between items-center" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
+                    <span className="text-accent" style={{ fontWeight: 600 }}>Score: {result.score.toFixed(3)}</span>
+                    <span className="text-secondary" style={{ fontSize: '0.9rem' }}>
+                      {result.source_type === 'web' ? `Web: ${result.title}` : `Doc: ${result.document_filename || result.document_id}`}
+                    </span>
+                  </div>
+                  <p style={{ lineHeight: 1.6, color: 'var(--text-primary)' }}>
+                    {result.content}
+                  </p>
+                  {result.source_type === 'web' && result.url && (
+                    <a href={result.url} target="_blank" rel="noopener noreferrer" className="text-accent" style={{ fontSize: '0.9rem' }}>
+                      {result.url}
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {!loading && results.length === 0 && hasSearched && !error && (
           <p className="text-secondary text-center">No results found for "{query}".</p>
